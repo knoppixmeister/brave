@@ -1,5 +1,5 @@
 /*
- * Copyright 2013-2019 The OpenZipkin Authors
+ * Copyright 2013-2020 The OpenZipkin Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  * in compliance with the License. You may obtain a copy of the License at
@@ -278,6 +278,17 @@ public final class TraceContext extends SamplingFlags {
       extra = context.extra;
     }
 
+    public final Builder clear() {
+      traceIdHigh = 0L;
+      traceId = 0L;
+      localRootId = 0L;
+      parentId = 0L;
+      spanId = 0L;
+      flags = 0;
+      extra = Collections.emptyList();
+      return this;
+    }
+
     /** @see TraceContext#traceIdHigh() */
     public Builder traceIdHigh(long traceIdHigh) {
       this.traceIdHigh = traceIdHigh;
@@ -455,11 +466,12 @@ public final class TraceContext extends SamplingFlags {
       Platform.get().log("{0} is not a lower-hex string", notLowerHex, null);
     }
 
+    /** @throws IllegalArgumentException if missing trace ID or span ID */
     public final TraceContext build() {
       String missing = "";
-      if (traceId == 0L) missing += " traceId";
+      if (traceIdHigh == 0L && traceId == 0L) missing += " traceId";
       if (spanId == 0L) missing += " spanId";
-      if (!"".equals(missing)) throw new IllegalStateException("Missing: " + missing);
+      if (!"".equals(missing)) throw new IllegalArgumentException("Missing: " + missing);
       return new TraceContext(
         flags, traceIdHigh, traceId, localRootId, parentId, spanId, ensureImmutable(extra)
       );
