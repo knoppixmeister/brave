@@ -1,5 +1,5 @@
 /*
- * Copyright 2013-2019 The OpenZipkin Authors
+ * Copyright 2013-2020 The OpenZipkin Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  * in compliance with the License. You may obtain a copy of the License at
@@ -48,7 +48,7 @@ public abstract class ScopedSpan {
 
   /** Returns the trace context associated with this span */
   // This api is exposed as there's always a context in scope by definition, and the context is
-  // needed for methods like ExtraFieldPropagation.set
+  // needed for methods like ExtraField.setValue
   public abstract TraceContext context();
 
   /**

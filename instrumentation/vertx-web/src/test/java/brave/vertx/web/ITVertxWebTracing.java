@@ -15,7 +15,6 @@ package brave.vertx.web;
 
 import brave.Tracing;
 import brave.http.HttpRequestParser;
-import brave.propagation.ExtraFieldPropagation;
 import brave.test.http.ITHttpServer;
 import io.vertx.core.Handler;
 import io.vertx.core.Vertx;
@@ -68,7 +67,7 @@ public class ITVertxWebTracing extends ITHttpServer {
       ctx.reroute("/async");
     });
     router.route("/extra").handler(ctx -> {
-      ctx.response().end(ExtraFieldPropagation.get(EXTRA_KEY));
+      ctx.response().end(EXTRA_FIELD.getValue());
     });
     router.route("/badrequest").handler(ctx -> {
       ctx.response().setStatusCode(400).end();

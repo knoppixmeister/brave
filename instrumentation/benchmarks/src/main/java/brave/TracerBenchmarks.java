@@ -1,5 +1,5 @@
 /*
- * Copyright 2013-2019 The OpenZipkin Authors
+ * Copyright 2013-2020 The OpenZipkin Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  * in compliance with the License. You may obtain a copy of the License at
@@ -19,7 +19,6 @@ import brave.propagation.B3Propagation;
 import brave.propagation.CurrentTraceContext;
 import brave.propagation.ExtraFieldPropagation;
 import brave.propagation.Propagation;
-import brave.propagation.SamplingFlags;
 import brave.propagation.TraceContext;
 import brave.propagation.TraceContextOrSamplingFlags;
 import java.util.concurrent.TimeUnit;
@@ -41,6 +40,9 @@ import org.openjdk.jmh.runner.options.Options;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
 import zipkin2.reporter.Reporter;
 
+import static brave.propagation.ExtraFieldPropagationBenchmarks.EXTRA_FIELD;
+import static brave.propagation.SamplingFlags.NOT_SAMPLED;
+
 @Measurement(iterations = 5, time = 1)
 @Warmup(iterations = 10, time = 1)
 @Fork(3)
@@ -49,8 +51,8 @@ import zipkin2.reporter.Reporter;
 @Threads(2)
 @State(Scope.Benchmark)
 public class TracerBenchmarks {
-  Propagation.Factory extraFactory = ExtraFieldPropagation.newFactory(
-    B3Propagation.FACTORY, "x-vcap-request-id");
+  Propagation.Factory extraFactory = ExtraFieldPropagation.newFactoryBuilder(B3Propagation.FACTORY)
+    .addField(EXTRA_FIELD).build();
 
   TraceContext context =
     TraceContext.newBuilder().traceIdHigh(333L).traceId(444L).spanId(3).sampled(true).build();
@@ -62,11 +64,10 @@ public class TracerBenchmarks {
   TraceContext sampledLocalContextExtra = extraFactory.decorate(sampledLocalContext);
   TraceContextOrSamplingFlags extracted = TraceContextOrSamplingFlags.create(context);
   TraceContextOrSamplingFlags extractedExtra = TraceContextOrSamplingFlags.create(contextExtra);
-  TraceContextOrSamplingFlags unsampledExtracted =
-    TraceContextOrSamplingFlags.create(SamplingFlags.NOT_SAMPLED);
+  TraceContextOrSamplingFlags unsampledExtracted = TraceContextOrSamplingFlags.create(NOT_SAMPLED);
   TraceContextOrSamplingFlags unsampledExtractedExtra =
     TraceContextOrSamplingFlags.newBuilder()
-      .samplingFlags(SamplingFlags.NOT_SAMPLED)
+      .samplingFlags(NOT_SAMPLED)
       .addExtra(contextExtra.extra())
       .build();
 
@@ -81,9 +82,7 @@ public class TracerBenchmarks {
         }
       })
       .spanReporter(Reporter.NOOP).build().tracer();
-    tracerExtra = Tracing.newBuilder()
-      .propagationFactory(ExtraFieldPropagation.newFactory(
-        B3Propagation.FACTORY, "x-vcap-request-id"))
+    tracerExtra = Tracing.newBuilder().propagationFactory(extraFactory)
       .addFinishedSpanHandler(new FinishedSpanHandler() {
         @Override public boolean handle(TraceContext context, MutableSpan span) {
           return true; // anonymous subtype prevents all recording from being no-op

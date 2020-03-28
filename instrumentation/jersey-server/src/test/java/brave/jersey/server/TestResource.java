@@ -26,7 +26,7 @@ import javax.ws.rs.container.Suspended;
 import javax.ws.rs.core.Response;
 import org.glassfish.jersey.server.ManagedAsync;
 
-import static brave.test.ITRemote.EXTRA_KEY;
+import static brave.test.ITRemote.EXTRA_FIELD;
 import static brave.test.http.ITHttpServer.NOT_READY_ISE;
 
 @Path("")
@@ -51,7 +51,7 @@ public class TestResource {
   @GET
   @Path("extra")
   public Response extra() {
-    return Response.ok(ExtraFieldPropagation.get(EXTRA_KEY)).build();
+    return Response.ok(ExtraFieldPropagation.get(EXTRA_FIELD.name())).build();
   }
 
   @GET

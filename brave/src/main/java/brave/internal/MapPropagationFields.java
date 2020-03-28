@@ -1,5 +1,5 @@
 /*
- * Copyright 2013-2019 The OpenZipkin Authors
+ * Copyright 2013-2020 The OpenZipkin Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  * in compliance with the License. You may obtain a copy of the License at
@@ -100,10 +100,14 @@ public class MapPropagationFields<K, V> extends PropagationFields<K, V> {
     }
   }
 
-  @Override public final Map<K, V> toMap() {
+  @Override public final Map<String, V> toMap() {
     Map<K, V> values = this.values;
     if (values == null) return Collections.emptyMap();
-    return values;
+    Map<String, V> result = new LinkedHashMap<>();
+    for (Map.Entry<K, V> entry : values.entrySet()) {
+      result.put(entry.getKey().toString(), entry.getValue());
+    }
+    return result;
   }
 
   @Override public int hashCode() { // for unit tests

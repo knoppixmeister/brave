@@ -1,5 +1,5 @@
 /*
- * Copyright 2013-2019 The OpenZipkin Authors
+ * Copyright 2013-2020 The OpenZipkin Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  * in compliance with the License. You may obtain a copy of the License at
@@ -38,8 +38,10 @@ import org.openjdk.jmh.runner.options.OptionsBuilder;
 @BenchmarkMode(Mode.SampleTime)
 @OutputTimeUnit(TimeUnit.MICROSECONDS)
 public class ExtraFieldPropagationBenchmarks {
-  static final Propagation.Factory
-    factory = ExtraFieldPropagation.newFactory(B3Propagation.FACTORY, "x-vcap-request-id");
+  public static final ExtraField.WithCorrelation EXTRA_FIELD =
+    ExtraField.newBuilder("user-id").withCorrelation().build();
+  static final Propagation.Factory factory =
+    ExtraFieldPropagation.newFactoryBuilder(B3Propagation.FACTORY).addField(EXTRA_FIELD).build();
   static final Propagation<String> extra = factory.create(Propagation.KeyFactory.STRING);
   static final Injector<Map<String, String>> extraInjector = extra.injector(Map::put);
   static final Extractor<Map<String, String>> extraExtractor = extra.extractor(Map::get);
@@ -57,7 +59,7 @@ public class ExtraFieldPropagationBenchmarks {
   static final Map<String, String> incoming = new LinkedHashMap<String, String>() {
     {
       extraInjector.inject(context, this);
-      put("x-vcap-request-id", "216a2aea45d08fc9");
+      put(EXTRA_FIELD.name(), "216a2aea45d08fc9");
     }
   };
 

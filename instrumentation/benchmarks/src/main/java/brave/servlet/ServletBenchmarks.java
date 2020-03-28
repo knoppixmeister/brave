@@ -1,5 +1,5 @@
 /*
- * Copyright 2013-2019 The OpenZipkin Authors
+ * Copyright 2013-2020 The OpenZipkin Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  * in compliance with the License. You may obtain a copy of the License at
@@ -22,7 +22,6 @@ import io.undertow.servlet.Servlets;
 import io.undertow.servlet.api.DeploymentInfo;
 import io.undertow.servlet.api.FilterInfo;
 import java.io.IOException;
-import java.util.Arrays;
 import javax.servlet.Filter;
 import javax.servlet.FilterChain;
 import javax.servlet.FilterConfig;
@@ -38,6 +37,7 @@ import org.openjdk.jmh.runner.options.Options;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
 import zipkin2.reporter.Reporter;
 
+import static brave.propagation.ExtraFieldPropagationBenchmarks.EXTRA_FIELD;
 import static javax.servlet.DispatcherType.REQUEST;
 
 public class ServletBenchmarks extends HttpServerBenchmarks {
@@ -46,7 +46,7 @@ public class ServletBenchmarks extends HttpServerBenchmarks {
     @Override protected void doGet(HttpServletRequest req, HttpServletResponse resp)
       throws IOException {
       // noop if not configured
-      ExtraFieldPropagation.set("country-code", "FO");
+      EXTRA_FIELD.setValue("FO");
       resp.addHeader("Content-Type", "text/plain; charset=UTF-8");
       resp.getWriter().println("hello world");
     }
@@ -70,10 +70,7 @@ public class ServletBenchmarks extends HttpServerBenchmarks {
     public TracedExtra() {
       super(TracingFilter.create(Tracing.newBuilder()
         .propagationFactory(ExtraFieldPropagation.newFactoryBuilder(B3Propagation.FACTORY)
-          .addField("x-vcap-request-id")
-          .addPrefixedFields("baggage-", Arrays.asList("country-code", "user-id"))
-          .build()
-        )
+          .addField(EXTRA_FIELD).build())
         .spanReporter(Reporter.NOOP)
         .build()));
     }

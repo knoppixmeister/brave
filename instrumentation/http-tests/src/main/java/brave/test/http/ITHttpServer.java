@@ -24,7 +24,7 @@ import brave.http.HttpRuleSampler;
 import brave.http.HttpServerParser;
 import brave.http.HttpTracing;
 import brave.propagation.B3SingleFormat;
-import brave.propagation.ExtraFieldPropagation;
+import brave.propagation.ExtraField;
 import brave.propagation.SamplingFlags;
 import brave.propagation.TraceContext;
 import brave.sampler.Sampler;
@@ -124,13 +124,13 @@ public abstract class ITHttpServer extends ITRemote {
   }
 
   /**
-   * The /extra endpoint should copy the key {@link #EXTRA_KEY} to the response body using {@link
-   * ExtraFieldPropagation#get(String)}.
+   * The /extra endpoint should copy the value of {@link #EXTRA_FIELD} to the response body using
+   * {@link ExtraField#getValue()}.
    */
   void readsExtra(Request.Builder builder) throws IOException {
     Request request = builder.url(url("/extra"))
       // this is the pre-configured key we can pass through
-      .header(EXTRA_KEY, "joey").build();
+      .header(EXTRA_FIELD.name(), "joey").build();
 
     Response response = get(request);
     assertThat(response.isSuccessful()).isTrue();

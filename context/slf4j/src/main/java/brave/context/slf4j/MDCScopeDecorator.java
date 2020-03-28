@@ -13,15 +13,11 @@
  */
 package brave.context.slf4j;
 
-import brave.internal.propagation.CorrelationFieldScopeDecoratorBuilder;
-import brave.propagation.CurrentTraceContext.ScopeDecorator;
-import org.slf4j.MDC;
+import brave.propagation.CorrelationFieldScopeDecorator;
+import brave.propagation.CurrentTraceContext;
 
 /**
- * Adds {@linkplain MDC} properties "traceId", "parentId", "spanId" and "sampled" when a {@link
- * brave.Tracer#currentSpan() span is current}. "traceId" and "spanId" are used in log correlation.
- * "parentId" is used for scenarios such as log parsing that reconstructs the trace tree. "sampled"
- * is used as a hint that a span found in logs might be in Zipkin.
+ * This is a shortcut to using {@link CorrelationFieldScopeDecorator} with {@link SLF4JContext}.
  *
  * <p>Ex.
  * <pre>{@code
@@ -33,47 +29,11 @@ import org.slf4j.MDC;
  *                  ...
  *                  .build();
  * }</pre>
+ *
+ * @see CorrelationFieldScopeDecorator
  */
 public final class MDCScopeDecorator {
-  /** @since 5.11 */
-  public static Builder newBuilder() {
-    return new Builder();
-  }
-
-  public static ScopeDecorator create() {
-    return new Builder().build();
-  }
-
-  /** @since 5.11 */
-  public static final class Builder extends CorrelationFieldScopeDecoratorBuilder<Builder> {
-    /** {@inheritDoc} */
-    @Override public Builder removeField(String fieldName) {
-      return super.removeField(fieldName);
-    }
-
-    /** {@inheritDoc} */
-    @Override public Builder addExtraField(String fieldName) {
-      return super.addExtraField(fieldName);
-    }
-
-    enum MDCContext implements Context {
-      INSTANCE;
-
-      @Override public String get(String name) {
-        return MDC.get(name);
-      }
-
-      @Override public void put(String name, String value) {
-        MDC.put(name, value);
-      }
-
-      @Override public void remove(String name) {
-        MDC.remove(name);
-      }
-    }
-
-    Builder() {
-      super(MDCContext.INSTANCE);
-    }
+  public static CurrentTraceContext.ScopeDecorator create() {
+    return CorrelationFieldScopeDecorator.newBuilder(new SLF4JContext()).build();
   }
 }

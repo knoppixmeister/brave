@@ -1,5 +1,5 @@
 /*
- * Copyright 2013-2019 The OpenZipkin Authors
+ * Copyright 2013-2020 The OpenZipkin Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  * in compliance with the License. You may obtain a copy of the License at
@@ -20,7 +20,6 @@ import brave.propagation.ExtraFieldPropagation;
 import brave.sampler.Sampler;
 import io.undertow.servlet.api.DeploymentInfo;
 import io.undertow.servlet.api.FilterInfo;
-import java.util.Arrays;
 import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.RunnerException;
 import org.openjdk.jmh.runner.options.Options;
@@ -32,6 +31,7 @@ import spark.servlet.SparkApplication;
 import spark.servlet.SparkFilter;
 import zipkin2.reporter.Reporter;
 
+import static brave.propagation.ExtraFieldPropagationBenchmarks.EXTRA_FIELD;
 import static javax.servlet.DispatcherType.REQUEST;
 
 public class SparkBenchmarks extends HttpServerBenchmarks {
@@ -73,17 +73,15 @@ public class SparkBenchmarks extends HttpServerBenchmarks {
     SparkTracing sparkTracing = SparkTracing.create(
       Tracing.newBuilder()
         .propagationFactory(ExtraFieldPropagation.newFactoryBuilder(B3Propagation.FACTORY)
-          .addField("x-vcap-request-id")
-          .addPrefixedFields("baggage-", Arrays.asList("country-code", "user-id"))
-          .build()
-        ).spanReporter(Reporter.NOOP).build()
+          .addField(EXTRA_FIELD).build())
+        .spanReporter(Reporter.NOOP).build()
     );
 
     @Override
     public void init() {
       Spark.before(sparkTracing.before());
       Spark.get("/tracedextra", (Request request, Response response) -> {
-        ExtraFieldPropagation.set("country-code", "FO");
+        EXTRA_FIELD.setValue("FO");
         return "hello world";
       });
       Spark.afterAfter(sparkTracing.afterAfter());

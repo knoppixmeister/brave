@@ -1,5 +1,5 @@
 /*
- * Copyright 2013-2019 The OpenZipkin Authors
+ * Copyright 2013-2020 The OpenZipkin Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  * in compliance with the License. You may obtain a copy of the License at
@@ -25,7 +25,7 @@ import java.util.Map;
  * context from affecting its parent.
  */
 public abstract class PropagationFields<K, V> {
-  public interface FieldConsumer<K, V> {
+  protected interface FieldConsumer<K, V> {
     // BiConsumer is Java 1.8+
     void accept(K key, V value);
   }
@@ -33,21 +33,26 @@ public abstract class PropagationFields<K, V> {
   long traceId, spanId; // guarded by this
 
   /** Returns the value of the field with the specified key or null if not available */
-  public abstract V get(K key);
+  protected abstract V get(K key);
 
   /** Replaces the value of the field with the specified key, ignoring if not a permitted field */
-  public abstract void put(K key, V value);
+  protected abstract void put(K key, V value);
 
   /** Invokes the consumer for every non-null field value */
-  public abstract void forEach(FieldConsumer<K, V> consumer);
+  protected abstract void forEach(FieldConsumer<K, V> consumer);
 
-  public abstract boolean isEmpty();
+  protected abstract boolean isEmpty();
 
-  /** for each field in the input replace the value if the key doesn't already exist */
-  abstract void putAllIfAbsent(PropagationFields<K, V> parent);
+  /**
+   * For each field in the input replace the value if the key doesn't already exist.
+   *
+   * <p>Note: this does not to synchronize internally as it is acting on newly constructed fields
+   * not yet returned to a caller.
+   */
+  protected abstract void putAllIfAbsent(PropagationFields<K, V> parent);
 
-  /** for testing and default toString */
-  protected abstract Map<K, V> toMap();
+  /** public for testing and default toString */
+  public abstract Map<String, V> toMap();
 
   /** Fields are extracted before a context is created. We need to lazy set the context */
   final boolean tryToClaim(long traceId, long spanId) {

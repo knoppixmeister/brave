@@ -15,8 +15,6 @@ package brave.kafka.streams;
 
 import brave.Span;
 import brave.propagation.CurrentTraceContext.Scope;
-import brave.propagation.ExtraFieldPropagation;
-import brave.propagation.TraceContext;
 import org.apache.kafka.common.header.Headers;
 import org.apache.kafka.common.header.internals.RecordHeaders;
 import org.apache.kafka.streams.KeyValue;
@@ -81,12 +79,10 @@ public class KafkaStreamsTracingTest extends ITKafkaStreams {
           new AbstractProcessor<String, String>() {
             @Override
             public void process(String key, String value) {
-              TraceContext context = currentTraceContext.get();
-              String userId = ExtraFieldPropagation.get(context, EXTRA_KEY);
-              assertThat(userId).isEqualTo("user1");
+              assertThat(EXTRA_FIELD.getValue()).isEqualTo("user1");
             }
           });
-    Headers headers = new RecordHeaders().add(EXTRA_KEY, "user1".getBytes());
+    Headers headers = new RecordHeaders().add(EXTRA_FIELD.name(), "user1".getBytes());
     Processor<String, String> processor = processorSupplier.get();
     processor.init(processorContextSupplier.apply(headers));
     processor.process(TEST_KEY, TEST_VALUE);

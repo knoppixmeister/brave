@@ -15,7 +15,6 @@ package brave.test.http;
 
 import brave.Tracer;
 import brave.http.HttpTracing;
-import brave.propagation.ExtraFieldPropagation;
 import brave.propagation.TraceContext;
 import java.io.IOException;
 import javax.servlet.Filter;
@@ -59,7 +58,7 @@ public abstract class ITServlet25Container extends ITServletContainer {
   static class ExtraServlet extends HttpServlet {
     @Override protected void doGet(HttpServletRequest req, HttpServletResponse resp)
       throws IOException {
-      resp.getWriter().print(ExtraFieldPropagation.get(EXTRA_KEY));
+      resp.getWriter().print(EXTRA_FIELD.getValue());
     }
   }
 
@@ -116,8 +115,7 @@ public abstract class ITServlet25Container extends ITServletContainer {
     @Override
     public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
       throws IOException, ServletException {
-      String extra = ExtraFieldPropagation.get(EXTRA_KEY);
-      ((HttpServletResponse) response).setHeader(EXTRA_KEY, extra);
+      ((HttpServletResponse) response).setHeader(EXTRA_FIELD.name(), EXTRA_FIELD.getValue());
       chain.doFilter(request, response);
     }
 
@@ -131,10 +129,10 @@ public abstract class ITServlet25Container extends ITServletContainer {
     String path = "/foo";
 
     Request request = new Request.Builder().url(url(path))
-      .header(EXTRA_KEY, "abcdefg").build();
+      .header(EXTRA_FIELD.name(), "abcdefg").build();
     try (Response response = client.newCall(request).execute()) {
       assertThat(response.isSuccessful()).isTrue();
-      assertThat(response.header(EXTRA_KEY))
+      assertThat(response.header(EXTRA_FIELD.name()))
         .isEqualTo("abcdefg");
     }
 
@@ -150,8 +148,8 @@ public abstract class ITServlet25Container extends ITServletContainer {
     public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
       throws IOException, ServletException {
       TraceContext context = (TraceContext) request.getAttribute("brave.propagation.TraceContext");
-      String extra = ExtraFieldPropagation.get(context, EXTRA_KEY);
-      ((HttpServletResponse) response).setHeader(EXTRA_KEY, extra);
+      String extra = EXTRA_FIELD.getValue(context);
+      ((HttpServletResponse) response).setHeader(EXTRA_FIELD.name(), extra);
       chain.doFilter(request, response);
     }
 
@@ -165,10 +163,10 @@ public abstract class ITServlet25Container extends ITServletContainer {
     String path = "/foo";
 
     Request request = new Request.Builder().url(url(path))
-      .header(EXTRA_KEY, "abcdefg").build();
+      .header(EXTRA_FIELD.name(), "abcdefg").build();
     try (Response response = client.newCall(request).execute()) {
       assertThat(response.isSuccessful()).isTrue();
-      assertThat(response.header(EXTRA_KEY))
+      assertThat(response.header(EXTRA_FIELD.name()))
         .isEqualTo("abcdefg");
     }
 

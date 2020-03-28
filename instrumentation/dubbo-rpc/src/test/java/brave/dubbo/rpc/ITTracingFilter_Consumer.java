@@ -15,7 +15,6 @@ package brave.dubbo.rpc;
 
 import brave.Clock;
 import brave.propagation.CurrentTraceContext.Scope;
-import brave.propagation.ExtraFieldPropagation;
 import brave.propagation.SamplingFlags;
 import brave.propagation.TraceContext;
 import brave.test.Unsupported;
@@ -79,12 +78,12 @@ public class ITTracingFilter_Consumer extends ITTracingFilter {
   @Test public void propagatesExtra() {
     TraceContext parent = newTraceContext(SamplingFlags.SAMPLED);
     try (Scope scope = currentTraceContext.newScope(parent)) {
-      ExtraFieldPropagation.set(parent, EXTRA_KEY, "joey");
+      EXTRA_FIELD.setValue(parent, "joey");
       client.get().sayHello("jorge");
     }
 
     TraceContext extracted = server.takeRequest().context();
-    assertThat(ExtraFieldPropagation.get(extracted, EXTRA_KEY)).isEqualTo("joey");
+    assertThat(EXTRA_FIELD.getValue(extracted)).isEqualTo("joey");
 
     reporter.takeRemoteSpan(Span.Kind.CLIENT);
   }
@@ -92,12 +91,12 @@ public class ITTracingFilter_Consumer extends ITTracingFilter {
   @Test public void propagatesExtra_unsampled() {
     TraceContext parent = newTraceContext(SamplingFlags.NOT_SAMPLED);
     try (Scope scope = currentTraceContext.newScope(parent)) {
-      ExtraFieldPropagation.set(parent, EXTRA_KEY, "joey");
+      EXTRA_FIELD.setValue(parent, "joey");
       client.get().sayHello("jorge");
     }
 
     TraceContext extracted = server.takeRequest().context();
-    assertThat(ExtraFieldPropagation.get(extracted, EXTRA_KEY)).isEqualTo("joey");
+    assertThat(EXTRA_FIELD.getValue(extracted)).isEqualTo("joey");
   }
 
   /** This prevents confusion as a blocking client should end before, the start of the next span. */

@@ -15,6 +15,7 @@ package brave.spring.beans;
 
 import brave.propagation.B3Propagation;
 import brave.propagation.B3SinglePropagation;
+import brave.propagation.ExtraField;
 import brave.propagation.ExtraFieldCustomizer;
 import brave.propagation.ExtraFieldPropagation;
 import brave.propagation.Propagation;
@@ -48,9 +49,7 @@ public class ExtraFieldPropagationFactoryBeanTest {
     context = new XmlBeans(""
       + "<bean id=\"propagationFactory\" class=\"brave.spring.beans.ExtraFieldPropagationFactoryBean\">\n"
       + "  <property name=\"propagationFactory\">\n"
-      + "    <util:constant static-field=\""
-      + B3SinglePropagation.class.getName()
-      + ".FACTORY\"/>\n"
+      + "    <util:constant static-field=\"brave.propagation.B3SinglePropagation.FACTORY\"/>\n"
       + "  </property>\n"
       + "</bean>"
     );
@@ -73,8 +72,9 @@ public class ExtraFieldPropagationFactoryBeanTest {
     );
 
     assertThat(context.getBean("propagationFactory", Propagation.Factory.class))
-      .extracting("keyNames").asInstanceOf(InstanceOfAssertFactories.ARRAY)
-      .containsExactly("customer-id", "x-vcap-request-id");
+      .extracting("extraFactory.fields").asInstanceOf(InstanceOfAssertFactories.ARRAY)
+      .usingFieldByFieldElementComparator()
+      .containsExactly(ExtraField.create("customer-id"), ExtraField.create("x-vcap-request-id"));
   }
 
   public static final ExtraFieldCustomizer CUSTOMIZER_ONE = mock(ExtraFieldCustomizer.class);

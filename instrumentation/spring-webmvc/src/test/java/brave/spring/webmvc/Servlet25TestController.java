@@ -15,7 +15,6 @@ package brave.spring.webmvc;
 
 import brave.Tracer;
 import brave.http.HttpTracing;
-import brave.propagation.ExtraFieldPropagation;
 import brave.test.ITRemote;
 import javax.servlet.UnavailableException;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -48,7 +47,7 @@ import static brave.test.http.ITServletContainer.NOT_READY_UE;
 
   @RequestMapping(value = "/extra")
   public ResponseEntity<String> extra() {
-    return new ResponseEntity<>(ExtraFieldPropagation.get(ITRemote.EXTRA_KEY), HttpStatus.OK);
+    return new ResponseEntity<>(ITRemote.EXTRA_FIELD.getValue(), HttpStatus.OK);
   }
 
   @RequestMapping(value = "/badrequest")

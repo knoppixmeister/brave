@@ -167,6 +167,12 @@ public abstract class CurrentTraceContext {
    * Use this to add features such as thread checks or log correlation fields when a scope is
    * created or closed.
    *
+   * <p>While decoration technically occurs with {@link #newScope(TraceContext)} or
+   * {@link #maybeScope(TraceContext)}, many tools use these underneath. For example, {@link
+   * brave.Tracer#startScopedSpan(String)} and {@link brave.Tracer#withSpanInScope(brave.Span)} set
+   * a span in scope. An executor wrapped with {@link #executor(Executor)} would decorate each
+   * runnable.
+   *
    * @since 5.2
    */
   public interface ScopeDecorator {

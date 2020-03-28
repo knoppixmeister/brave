@@ -1,5 +1,5 @@
 /*
- * Copyright 2013-2019 The OpenZipkin Authors
+ * Copyright 2013-2020 The OpenZipkin Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  * in compliance with the License. You may obtain a copy of the License at
@@ -15,9 +15,8 @@ package brave.features.opentracing;
 
 import brave.Tracing;
 import brave.propagation.B3Propagation;
+import brave.propagation.ExtraField;
 import brave.propagation.ExtraFieldPropagation;
-import brave.propagation.StrictScopeDecorator;
-import brave.propagation.ThreadLocalCurrentTraceContext;
 import brave.propagation.TraceContext;
 import io.opentracing.propagation.Format;
 import io.opentracing.propagation.TextMapAdapter;
@@ -37,12 +36,12 @@ import static org.assertj.core.data.MapEntry.entry;
  * the core concepts.
  */
 public class OpenTracingAdapterTest {
+  static final ExtraField EXTRA_FIELD = ExtraField.newBuilder("user-id").build();
+
   List<zipkin2.Span> spans = new ArrayList<>();
   Tracing brave = Tracing.newBuilder()
-    .currentTraceContext(ThreadLocalCurrentTraceContext.newBuilder()
-      .addScopeDecorator(StrictScopeDecorator.create())
-      .build())
-    .propagationFactory(ExtraFieldPropagation.newFactory(B3Propagation.FACTORY, "client-id"))
+    .propagationFactory(ExtraFieldPropagation.newFactoryBuilder(B3Propagation.FACTORY)
+      .addField(EXTRA_FIELD).build())
     .spanReporter(spans::add).build();
 
   BraveTracer opentracing = BraveTracer.wrap(brave);
@@ -83,7 +82,7 @@ public class OpenTracingAdapterTest {
     map.put("X-B3-TraceId", "0000000000000001");
     map.put("X-B3-SpanId", "0000000000000002");
     map.put("X-B3-Sampled", "1");
-    map.put("Client-Id", "sammy");
+    map.put("User-Id", "sammy");
 
     BraveSpanContext openTracingContext =
       opentracing.extract(Format.Builtin.HTTP_HEADERS, new TextMapAdapter(map));
@@ -95,7 +94,7 @@ public class OpenTracingAdapterTest {
         .sampled(true).build());
 
     assertThat(openTracingContext.baggageItems())
-      .containsExactly(entry("client-id", "sammy"));
+      .containsExactly(entry(EXTRA_FIELD.name(), "sammy"));
   }
 
   @Test

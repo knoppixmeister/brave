@@ -18,9 +18,10 @@ import brave.ErrorParser;
 import brave.Tracing;
 import brave.TracingCustomizer;
 import brave.handler.FinishedSpanHandler;
-import brave.propagation.ExtraFieldPropagation;
+import brave.propagation.ExtraField;
 import brave.propagation.ThreadLocalCurrentTraceContext;
 import brave.sampler.Sampler;
+import org.assertj.core.api.InstanceOfAssertFactories;
 import org.junit.After;
 import org.junit.Test;
 import zipkin2.Endpoint;
@@ -217,10 +218,13 @@ public class TracingFactoryBeanTest {
       + "</bean>"
     );
 
-    assertThat(context.getBean("tracing", Tracing.class).propagation())
-      .isInstanceOf(ExtraFieldPropagation.class)
-      .extracting("factory.fieldNames")
-      .isEqualToComparingFieldByField(new String[] {"x-vcap-request-id", "x-amzn-trace-id"});
+    assertThat(context.getBean("tracing", Tracing.class).propagationFactory())
+      .extracting("extraFactory.fields").asInstanceOf(InstanceOfAssertFactories.ARRAY)
+      .usingFieldByFieldElementComparator()
+      .containsExactly(
+        ExtraField.create("x-vcap-request-id"),
+        ExtraField.create("x-amzn-trace-id")
+      );
   }
 
   @Test public void traceId128Bit() {

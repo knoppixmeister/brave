@@ -15,6 +15,7 @@ package brave.test;
 
 import brave.Tracing;
 import brave.propagation.B3Propagation;
+import brave.propagation.ExtraField;
 import brave.propagation.ExtraFieldPropagation;
 import brave.propagation.Propagation;
 import brave.propagation.SamplingFlags;
@@ -44,7 +45,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * </ul></pre>
  */
 public abstract class ITRemote {
-  public static final String EXTRA_KEY = "user-id";
+  public static final ExtraField EXTRA_FIELD = ExtraField.create("user-id");
 
   /**
    * We use a global rule instead of surefire config as this could be executed in gradle, sbt, etc.
@@ -79,7 +80,8 @@ public abstract class ITRemote {
       .build();
 
   protected final Propagation.Factory propagationFactory =
-    ExtraFieldPropagation.newFactory(B3Propagation.FACTORY, EXTRA_KEY);
+    ExtraFieldPropagation.newFactoryBuilder(B3Propagation.FACTORY)
+      .addField(EXTRA_FIELD).build();
 
   protected Tracing tracing = tracingBuilder(Sampler.ALWAYS_SAMPLE).build();
 

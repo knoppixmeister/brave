@@ -15,17 +15,12 @@ package brave.propagation;
 
 import brave.Tracing;
 import brave.internal.Nullable;
-import brave.internal.PredefinedPropagationFields;
-import brave.internal.PropagationFields;
-import brave.internal.PropagationFieldsFactory;
 import brave.propagation.TraceContext.Extractor;
 import brave.propagation.TraceContext.Injector;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.BitSet;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -33,208 +28,164 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
+import static brave.propagation.CorrelationFields.validateName;
+
 /**
- * Allows you to propagate predefined request-scoped fields, usually but not always HTTP headers.
+ * This implements {@linkplain ExtraField extra field} in-process and remote propagation.
  *
- * <p>For example, if you are in a Cloud Foundry environment, you might want to pass the request
- * ID:
+ * <p>For example, if you have a need to know the a specific request's country code, you can
+ * propagate it through the trace as HTTP headers.
  * <pre>{@code
- * // when you initialize the builder, define the extra field you want to propagate
- * tracingBuilder.propagationFactory(
- *   ExtraFieldPropagation.newFactory(B3Propagation.FACTORY, "x-vcap-request-id")
- * );
+ * // Configure your extra field
+ * countryCode = ExtraField.create("country-code");
  *
- * // later, you can tag that request ID or use it in log correlation
- * requestId = ExtraFieldPropagation.get("x-vcap-request-id");
- *
- * // You can also set or override the value similarly, which might be needed if a new request
- * ExtraFieldPropagation.get("x-country-code", "FO");
- * }</pre>
- *
- * <h3>Appropriate usage</h3>
- * It is generally not a good idea to use the tracing system for application logic or critical code
- * such as security context propagation.
- *
- * <p>Brave is an infrastructure library: you will create lock-in if you expose its apis into
- * business code. Prefer exposing your own types for utility functions that use this class as this
- * will insulate you from lock-in.
- *
- * <p>While it may seem convenient, do not use this for security context propagation as it was not
- * designed for this use case. For example, anything placed in here can be accessed by any code in
- * the same classloader!
- *
- * <h3>Passing through alternate trace contexts</h3>
- * <p>You may also need to propagate an second trace context transparently. For example, when in
- * an Amazon Web Services environment, but not reporting data to X-Ray. To ensure X-Ray can co-exist
- * correctly, pass-through its tracing header like so.
- *
- * <pre>{@code
- * tracingBuilder.propagationFactory(
- *   ExtraFieldPropagation.newFactory(B3Propagation.FACTORY, "x-amzn-trace-id")
- * );
- * }</pre>
- *
- * <h3>Prefixed fields</h3>
- * <p>You can also prefix fields, if they follow a common pattern. For example, the following will
- * propagate the field "x-vcap-request-id" as-is, but send the fields "country-code" and "user-id"
- * on the wire as "baggage-country-code" and "baggage-user-id" respectively.
- *
- * <pre>{@code
- * // Setup your tracing instance with allowed fields
+ * // When you initialize the builder, add the extra field you want to propagate
  * tracingBuilder.propagationFactory(
  *   ExtraFieldPropagation.newFactoryBuilder(B3Propagation.FACTORY)
- *                        .addField("x-vcap-request-id")
- *                        .addPrefixedFields("baggage-", Arrays.asList("country-code", "user-id"))
+ *                        .addField(countryCode)
  *                        .build()
  * );
- *
- * // Later, you can call below to affect the country code of the current trace context
- * ExtraFieldPropagation.set("country-code", "FO");
- * String countryCode = ExtraFieldPropagation.get("country-code");
- *
- * // Or, if you have a reference to a trace context, use it explicitly
- * ExtraFieldPropagation.set(span.context(), "country-code", "FO");
- * String countryCode = ExtraFieldPropagation.get(span.context(), "country-code");
- * }</pre>
  */
 public class ExtraFieldPropagation<K> implements Propagation<K> {
-  /** Wraps an underlying propagation implementation, pushing one or more fields */
-  public static Factory newFactory(Propagation.Factory delegate, String... fieldNames) {
+  /** @deprecated Since 5.11 please always use {@link #newFactoryBuilder(Propagation.Factory)) */
+  @Deprecated public static Factory newFactory(Propagation.Factory delegate, String... names) {
     if (delegate == null) throw new NullPointerException("delegate == null");
-    if (fieldNames == null) throw new NullPointerException("fieldNames == null");
-    return newFactory(delegate, Arrays.asList(fieldNames));
+    if (names == null) throw new NullPointerException("field names == null");
+    return newFactory(delegate, Arrays.asList(names));
   }
 
-  /** Wraps an underlying propagation implementation, pushing one or more fields */
-  public static Factory newFactory(Propagation.Factory delegate, Collection<String> fieldNames) {
+  /** @deprecated Since 5.11 please always use {@link #newFactoryBuilder(Propagation.Factory)) */
+  @Deprecated
+  public static Factory newFactory(Propagation.Factory delegate, Collection<String> names) {
     if (delegate == null) throw new NullPointerException("delegate == null");
-    if (fieldNames == null) throw new NullPointerException("fieldNames == null");
-    String[] validated = ensureLowerCaseFieldNames(new LinkedHashSet<>(fieldNames));
-    return new RealFactory(delegate, validated, validated, new BitSet());
+    if (names == null) throw new NullPointerException("field names == null");
+    if (names.isEmpty()) throw new IllegalArgumentException("no field names");
+    FactoryBuilder builder = new FactoryBuilder(delegate);
+    for (String name : names) builder.addField(ExtraField.create(name));
+    return builder.build();
   }
 
+  /** Wraps an underlying propagation implementation, pushing one or more fields. */
   public static FactoryBuilder newFactoryBuilder(Propagation.Factory delegate) {
     return new FactoryBuilder(delegate);
   }
 
   public static final class FactoryBuilder {
     final Propagation.Factory delegate;
-    final Set<String> fieldNames = new LinkedHashSet<>();
-    final Set<String> redactedFieldNames = new LinkedHashSet<>();
-    final Map<String, String[]> prefixedNames = new LinkedHashMap<>();
+    final Set<String> names = new LinkedHashSet<>();
+    final Set<String> redactedNames = new LinkedHashSet<>();
+    final Map<String, Set<String>> nameToPrefixes = new LinkedHashMap<>();
+
+    final Set<ExtraField> fields = new LinkedHashSet<>();
 
     FactoryBuilder(Propagation.Factory delegate) {
       if (delegate == null) throw new NullPointerException("delegate == null");
       this.delegate = delegate;
     }
 
-    /** Same as {@link #addField} except that this field is redacted from downstream propagation. */
-    public FactoryBuilder addRedactedField(String fieldName) {
-      fieldName = validateFieldName(fieldName);
-      fieldNames.add(fieldName);
-      redactedFieldNames.add(fieldName);
+    /**
+     * Adds an {@linkplain ExtraField extra field} for remote propagation.
+     *
+     * @since 5.11
+     */
+    public FactoryBuilder addField(ExtraField field) {
+      if (field == null) throw new NullPointerException("field == null");
+      fields.add(field);
       return this;
     }
 
-    /**
-     * Adds a field that is referenced the same in-process as it is on the wire. For example, the
-     * name "x-vcap-request-id" would be set as-is including the prefix.
-     *
-     * <p>Note: {@code fieldName} will be implicitly lower-cased.
-     */
-    public FactoryBuilder addField(String fieldName) {
-      fieldNames.add(validateFieldName(fieldName));
+    /** @deprecated Since 5.11 please always use {@link #addField(ExtraField)) */
+    public FactoryBuilder addRedactedField(String name) {
+      name = validateName(name).toLowerCase(Locale.ROOT);
+      names.add(name);
+      redactedNames.add(name);
       return this;
     }
 
-    /**
-     * Adds a prefix when fields are extracted or injected from headers. For example, if the prefix
-     * is "baggage-", the field "country-code" would end up as "baggage-country-code" on the wire.
-     *
-     * <p>Note: any {@code fieldNames} will be implicitly lower-cased.
-     */
-    public FactoryBuilder addPrefixedFields(String prefix, Collection<String> fieldNames) {
+    /** @deprecated Since 5.11 please always use {@link #addField(ExtraField)) */
+    public FactoryBuilder addField(String name) {
+      names.add(validateName(name).toLowerCase(Locale.ROOT));
+      return this;
+    }
+
+    /** @deprecated Since 5.11 please always use {@link #addField(ExtraField)) */
+    public FactoryBuilder addPrefixedFields(String prefix, Collection<String> names) {
       if (prefix == null) throw new NullPointerException("prefix == null");
       if (prefix.isEmpty()) throw new IllegalArgumentException("prefix is empty");
-      if (fieldNames == null) throw new NullPointerException("fieldNames == null");
-      prefixedNames.put(prefix, ensureLowerCaseFieldNames(new LinkedHashSet<>(fieldNames)));
+      if (names == null) throw new NullPointerException("names == null");
+      for (String name : names) {
+        name = validateName(name).toLowerCase(Locale.ROOT);
+        Set<String> prefixes = nameToPrefixes.get(name);
+        if (prefixes == null) nameToPrefixes.put(name, prefixes = new LinkedHashSet<>());
+        prefixes.add(prefix);
+      }
       return this;
+    }
+
+    Set<ExtraField> convertDeprecated() {
+      Set<String> remainingNames = new LinkedHashSet<>(names);
+      Set<ExtraField> result = new LinkedHashSet<>();
+      for (Map.Entry<String, Set<String>> entry : nameToPrefixes.entrySet()) {
+        String name = entry.getKey();
+        ExtraField.Builder builder = ExtraField.newBuilder(name);
+        if (redactedNames.contains(name)) builder.redacted();
+        if (!remainingNames.remove(name)) builder.clearKeys();
+        for (String prefix : entry.getValue()) {
+          builder.addKey(prefix + name);
+        }
+        result.add(builder.build());
+      }
+
+      for (String name : remainingNames) {
+        ExtraField.Builder builder = ExtraField.newBuilder(name);
+        if (redactedNames.contains(name)) builder.redacted();
+        result.add(builder.build());
+      }
+      return result;
     }
 
     /** Returns a wrapper of the delegate if there are no fields to propagate. */
     public Factory build() {
-      BitSet redacted = new BitSet();
-      List<String> fields = new ArrayList<>(), keys = new ArrayList<>();
-      List<Integer> keyToFieldList = new ArrayList<>();
-
-      // First pass: add any field names that are used as propagation keys directly
-      int i = 0;
-      for (String fieldName : fieldNames) {
-        if (redactedFieldNames.contains(fieldName)) redacted.set(i); // flag to redact on inject
-        fields.add(fieldName);
-        keys.add(fieldName);
-        keyToFieldList.add(i++);
-      }
-
-      // Second pass: add prefixed fields, noting a prefixed field could be a dupe of a non-prefixed
-      for (Map.Entry<String, String[]> entry : prefixedNames.entrySet()) {
-        String nextPrefix = entry.getKey();
-        String[] nextFieldNames = entry.getValue();
-        for (i = 0; i < nextFieldNames.length; i++) {
-          String nextFieldName = nextFieldNames[i];
-          int index = fields.indexOf(nextFieldName);
-          if (index == -1) {
-            index = fields.size();
-            fields.add(nextFieldName);
-          }
-          keys.add(nextPrefix + nextFieldName);
-          keyToFieldList.add(index);
-        }
-      }
-
-      // Last pass: we may have multiple propagation keys pointing to the same field. Create an
-      // index so that an update a field mapped as "user-id" and "x-user-id" affect the same cell
-      int[] keyToField = new int[keys.size()];
-      for (i = 0; i < keyToField.length; i++) {
-        keyToField[i] = keyToFieldList.get(i);
-      }
+      Set<ExtraField> fields = convertDeprecated();
+      fields.addAll(this.fields); // clobbering deprecated config is ok
 
       if (fields.isEmpty()) return new Factory(delegate);
-      return new RealFactory(delegate, fields.toArray(new String[0]), keys.toArray(new String[0]),
-        keyToField, redacted);
+      return new RealFactory(delegate, fields.toArray(new ExtraField[0]));
     }
   }
 
-  /** Synonym for {@link #get(String)} */
-  @Nullable public static String current(String name) {
-    return get(name);
+  /** @deprecated Since 5.11 use {@link ExtraField#getValue(String)} */
+  @Deprecated @Nullable public static String current(String name) {
+    return ExtraField.getValue(name);
   }
 
-  /**
-   * Returns the value of the field with the specified key or null if not available.
-   *
-   * <p>Prefer {@link #get(TraceContext, String)} if you have a reference to a span.
-   */
-  @Nullable public static String get(String name) {
-    TraceContext context = currentTraceContext();
-    return context != null ? get(context, name) : null;
+  /** @deprecated Since 5.11 use {@link ExtraField#getValue(TraceContext, String)} */
+  @Deprecated @Nullable public static String get(TraceContext context, String name) {
+    return ExtraField.getValue(context, name);
   }
 
-  /**
-   * Sets the current value of the field with the specified key, or drops if not a configured
-   * field.
-   *
-   * <p>Prefer {@link #set(TraceContext, String, String)} if you have a reference to a span.
-   */
-  public static void set(String name, String value) {
-    TraceContext context = currentTraceContext();
-    if (context != null) set(context, name, value);
+  /** @deprecated Since 5.11 use {@link ExtraField#getValue(String)} */
+  @Deprecated @Nullable public static String get(String name) {
+    return ExtraField.getValue(name);
+  }
+
+  /** @deprecated Since 5.11 use {@link ExtraField#setValue(TraceContext, String, String)} */
+  @Deprecated public static void set(TraceContext context, String name, String value) {
+    ExtraField.setValue(context, name, value);
+  }
+
+  /** @deprecated Since 5.11 use {@link ExtraField#setValue(String, String)} */
+  @Deprecated public static void set(String name, String value) {
+    ExtraField.setValue(name, value);
   }
 
   /**
    * Returns a mapping of fields in the current trace context, or empty if there are none.
    *
-   * <p>Prefer {@link #set(TraceContext, String, String)} if you have a reference to a span.
+   * <p>Prefer {@link #set(TraceContext, String, String)} if you have a reference to the trace
+   * context.
+   *
+   * @see ExtraField#name()
    */
   public static Map<String, String> getAll() {
     TraceContext context = currentTraceContext();
@@ -242,35 +193,25 @@ public class ExtraFieldPropagation<K> implements Propagation<K> {
     return getAll(context);
   }
 
-  /** Returns a mapping of any fields in the extraction result. */
+  /** Like {@link #getAll()} except extracts the input instead of the current trace context. */
   public static Map<String, String> getAll(TraceContextOrSamplingFlags extracted) {
     if (extracted == null) throw new NullPointerException("extracted == null");
     TraceContext extractedContext = extracted.context();
     if (extractedContext != null) return getAll(extractedContext);
-    Extra fields = TraceContext.findExtra(Extra.class, extracted.extra());
+    ExtraFields fields = TraceContext.findExtra(ExtraFields.class, extracted.extra());
     return fields != null ? fields.toMap() : Collections.emptyMap();
   }
 
-  /** Returns a mapping of any fields in the trace context. */
+  /** Like {@link #getAll()} except extracts the input instead of the current trace context. */
   public static Map<String, String> getAll(TraceContext context) {
     if (context == null) throw new NullPointerException("context == null");
-    Extra fields = context.findExtra(Extra.class);
+    ExtraFields fields = context.findExtra(ExtraFields.class);
     return fields != null ? fields.toMap() : Collections.emptyMap();
   }
 
   @Nullable static TraceContext currentTraceContext() {
     Tracing tracing = Tracing.current();
     return tracing != null ? tracing.currentTraceContext().get() : null;
-  }
-
-  /** Returns the value of the field with the specified key or null if not available */
-  @Nullable public static String get(TraceContext context, String name) {
-    return PropagationFields.get(context, lowercase(name), Extra.class);
-  }
-
-  /** Sets the value of the field with the specified key, or drops if not a configured field */
-  public static void set(TraceContext context, String name, String value) {
-    PropagationFields.put(context, lowercase(name), value, Extra.class);
   }
 
   public static class Factory extends Propagation.Factory {
@@ -297,46 +238,39 @@ public class ExtraFieldPropagation<K> implements Propagation<K> {
     }
   }
 
+  static class ExtraFieldWithKeys<K> {
+    final ExtraField field;
+    /** Corresponds to {@link ExtraField#keys()} */
+    final K[] keys;
+
+    ExtraFieldWithKeys(ExtraField field, K[] keys) {
+      this.field = field;
+      this.keys = keys;
+    }
+  }
+
   static final class RealFactory extends Factory {
-    final String[] fieldNames;
-    final String[] keyNames;
-    final int[] keyToField;
-    final BitSet redacted;
-    final ExtraFactory extraFactory;
+    final ExtraFields.Factory extraFactory;
 
-    RealFactory(Propagation.Factory delegate, String[] fieldNames, String[] keyNames,
-      BitSet redacted) {
-      this(delegate, fieldNames, keyNames, keyToField(keyNames), redacted);
-    }
-
-    /**
-     * We have a key to field mapping as there may be multiple propagation keys that reference the
-     * same field. For example, "baggage-userid" and "baggage_userid".
-     */
-    static int[] keyToField(String[] keyNames) {
-      int[] result = new int[keyNames.length];
-      for (int i = 0; i < result.length; i++) result[i] = i;
-      return result;
-    }
-
-    RealFactory(Propagation.Factory delegate, String[] fieldNames, String[] keyNames,
-      int[] keyToField, BitSet redacted) {
+    RealFactory(Propagation.Factory delegate, ExtraField[] fields) {
       super(delegate);
-      this.keyToField = keyToField;
-      this.fieldNames = fieldNames;
-      this.keyNames = keyNames;
-      this.redacted = redacted;
-      this.extraFactory = new ExtraFactory(fieldNames);
+      this.extraFactory = new ExtraFields.Factory(fields);
     }
 
     @Override
     public final <K> ExtraFieldPropagation<K> create(Propagation.KeyFactory<K> keyFactory) {
-      int length = keyNames.length;
-      List<K> keys = new ArrayList<>(length);
-      for (int i = 0; i < length; i++) {
-        keys.add(keyFactory.create(keyNames[i]));
+      int i = 0;
+      List<K> allKeys = new ArrayList<>();
+      ExtraFieldWithKeys<K>[] fieldsWithKeys = new ExtraFieldWithKeys[extraFactory.fields.length];
+      for (ExtraField field : extraFactory.fields) {
+        K[] keysForField = (K[]) new Object[field.keys.length];
+        for (int j = 0, length = field.keys.length; j < length; j++) {
+          keysForField[j] = keyFactory.create(field.keys[j]);
+          allKeys.add(keysForField[j]);
+        }
+        fieldsWithKeys[i++] = new ExtraFieldWithKeys<>(field, keysForField);
       }
-      return new RealExtraFieldPropagation<>(this, keyFactory, keys, redacted);
+      return new RealExtraFieldPropagation<>(this, keyFactory, fieldsWithKeys, allKeys);
     }
 
     @Override public TraceContext decorate(TraceContext context) {
@@ -380,19 +314,20 @@ public class ExtraFieldPropagation<K> implements Propagation<K> {
 
   static final class RealExtraFieldPropagation<K> extends ExtraFieldPropagation<K> {
     final RealFactory factory;
-    final List<K> keys;
-    final BitSet redacted;
+    final ExtraFieldWithKeys<K>[] fieldsWithKeys;
+    final List<K> allKeys;
 
-    RealExtraFieldPropagation(RealFactory factory, Propagation.KeyFactory<K> keyFactory,
-      List<K> keys, BitSet redacted) {
+    RealExtraFieldPropagation(
+      RealFactory factory, Propagation.KeyFactory<K> keyFactory,
+      ExtraFieldWithKeys<K>[] fieldsWithKeys, List<K> allKeys) {
       super(factory.delegate, keyFactory);
       this.factory = factory;
-      this.keys = keys;
-      this.redacted = redacted;
+      this.fieldsWithKeys = fieldsWithKeys;
+      this.allKeys = Collections.unmodifiableList(allKeys);
     }
 
     @Override public List<K> extraKeys() {
-      return keys;
+      return allKeys;
     }
 
     @Override public <C> Injector<C> injector(Setter<C, K> setter) {
@@ -417,17 +352,17 @@ public class ExtraFieldPropagation<K> implements Propagation<K> {
 
     @Override public void inject(TraceContext traceContext, C carrier) {
       delegate.inject(traceContext, carrier);
-      Extra extra = traceContext.findExtra(Extra.class);
+      ExtraFields extra = traceContext.findExtra(ExtraFields.class);
       if (extra == null) return;
       inject(extra, carrier);
     }
 
-    void inject(Extra fields, C carrier) {
-      for (int i = 0, length = propagation.keys.size(); i < length; i++) {
-        if (propagation.redacted.get(i)) continue; // don't propagate downstream
-        String maybeValue = fields.get(propagation.factory.keyToField[i]);
+    void inject(ExtraFields fields, C carrier) {
+      for (ExtraFieldWithKeys<K> fieldWithKeys : propagation.fieldsWithKeys) {
+        if (fieldWithKeys.field.redacted) continue; // don't propagate downstream
+        String maybeValue = fields.get(fieldWithKeys.field);
         if (maybeValue == null) continue;
-        setter.put(carrier, propagation.keys.get(i), maybeValue);
+        for (K key : fieldWithKeys.keys) setter.put(carrier, key, maybeValue);
       }
     }
   }
@@ -446,74 +381,19 @@ public class ExtraFieldPropagation<K> implements Propagation<K> {
     @Override public TraceContextOrSamplingFlags extract(C carrier) {
       TraceContextOrSamplingFlags result = delegate.extract(carrier);
 
-      // always allocate in case fields are added late
-      Extra fields = propagation.factory.extraFactory.create();
-      for (int i = 0, length = propagation.keys.size(); i < length; i++) {
-        String maybeValue = getter.get(carrier, propagation.keys.get(i));
-        if (maybeValue == null) continue;
-        fields.put(propagation.factory.keyToField[i], maybeValue);
+      // always allocate in case values are added late
+      ExtraFields fields = propagation.factory.extraFactory.create();
+      for (ExtraFieldWithKeys<K> fieldWithKeys : propagation.fieldsWithKeys) {
+        for (K key : fieldWithKeys.keys) { // possibly multiple keys when prefixes are in use
+          String maybeValue = getter.get(carrier, key);
+          if (maybeValue != null) { // accept the first match
+            fields.put(fieldWithKeys.field, maybeValue);
+            break;
+          }
+        }
       }
+
       return result.toBuilder().addExtra(fields).build();
     }
-  }
-
-  static String[] ensureLowerCaseFieldNames(Collection<String> fieldNames) {
-    if (fieldNames.isEmpty()) throw new IllegalArgumentException("no field names");
-    Iterator<String> nextName = fieldNames.iterator();
-    String[] result = new String[fieldNames.size()];
-    for (int i = 0; nextName.hasNext(); i++) {
-      String name = nextName.next();
-      if (name == null) throw new NullPointerException("fieldNames[" + i + "] == null");
-      name = name.trim();
-      if (name.isEmpty()) throw new IllegalArgumentException("fieldNames[" + i + "] is empty");
-      result[i] = name.toLowerCase(Locale.ROOT);
-    }
-    return result;
-  }
-
-  static final class ExtraFactory extends PropagationFieldsFactory<String, String, Extra> {
-    final String[] fieldNames;
-
-    ExtraFactory(String[] fieldNames) {
-      this.fieldNames = fieldNames;
-    }
-
-    @Override public Class<Extra> type() {
-      return Extra.class;
-    }
-
-    @Override protected Extra create() {
-      return new Extra(fieldNames);
-    }
-
-    @Override protected Extra create(Extra parent) {
-      return new Extra(parent, fieldNames);
-    }
-
-    @Override protected TraceContext contextWithExtra(TraceContext context, List<Object> extra) {
-      return context.withExtra(extra); // more efficient
-    }
-  }
-
-  static final class Extra extends PredefinedPropagationFields {
-    Extra(String... fieldNames) {
-      super(fieldNames);
-    }
-
-    Extra(Extra parent, String... fieldNames) {
-      super(parent, fieldNames);
-    }
-  }
-
-  static String lowercase(String name) {
-    if (name == null) throw new NullPointerException("name == null");
-    return name.toLowerCase(Locale.ROOT);
-  }
-
-  static String validateFieldName(String fieldName) {
-    if (fieldName == null) throw new NullPointerException("fieldName == null");
-    fieldName = fieldName.toLowerCase(Locale.ROOT).trim();
-    if (fieldName.isEmpty()) throw new IllegalArgumentException("fieldName is empty");
-    return fieldName;
   }
 }

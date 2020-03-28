@@ -2,13 +2,14 @@
 This adds trace and span IDs to the Log4J 2 Thread Context so that you
 can search or aggregate logs accordingly.
 
-To enable this, configure `brave.Tracing` with `ThreadContextScopeDecorator`
+To enable this, configure `brave.Tracing` with `Log4j2Context`
 like so:
 
 ```java
+correlationContext = new Log4j2Context();
 tracing = Tracing.newBuilder()
     .currentTraceContext(ThreadLocalCurrentTraceContext.newBuilder()
-       .addScopeDecorator(ThreadContextScopeDecorator.create())
+        .addScopeDecorator(CorrelationFieldScopeDecorator.create(correlationContext))
        .build()
     )
     ...

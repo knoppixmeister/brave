@@ -15,7 +15,6 @@ package brave.propagation;
 
 import brave.Tracing;
 import brave.propagation.CurrentTraceContext.Scope;
-import brave.propagation.ExtraFieldPropagation.Extra;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -31,12 +30,15 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.entry;
 
 public class ExtraFieldPropagationTest {
+  ExtraField vcapRequestId = ExtraField.create("x-vcap-request-id");
+  ExtraField amznTraceId = ExtraField.create("x-amzn-trace-id");
   String awsTraceId =
     "Root=1-67891233-abcdef012345678912345678;Parent=463ac35c9f6413ad;Sampled=1";
   String uuid = "f4308d05-2228-4468-80f6-92a8377ba193";
-  ExtraFieldPropagation.Factory factory = ExtraFieldPropagation.newFactory(
-    B3SinglePropagation.FACTORY, "x-vcap-request-id", "x-amzn-trace-id"
-  );
+  ExtraFieldPropagation.Factory factory =
+    ExtraFieldPropagation.newFactoryBuilder(B3SinglePropagation.FACTORY)
+      .addField(vcapRequestId)
+      .addField(amznTraceId).build();
 
   Map<String, String> carrier = new LinkedHashMap<>();
   TraceContext.Injector<Map<String, String>> injector;
@@ -67,23 +69,7 @@ public class ExtraFieldPropagationTest {
    */
   @Test public void extraKeysDontIncludeTraceContextKeys() {
     assertThat(factory.create(Propagation.KeyFactory.STRING).extraKeys())
-      .containsExactly("x-vcap-request-id", "x-amzn-trace-id");
-  }
-
-  @Test public void downcasesNames() {
-    ExtraFieldPropagation.RealFactory factory =
-      (ExtraFieldPropagation.RealFactory) ExtraFieldPropagation.newFactory(B3Propagation.FACTORY,
-        "X-FOO");
-    assertThat(factory.fieldNames)
-      .containsExactly("x-foo");
-  }
-
-  @Test public void trimsNames() {
-    ExtraFieldPropagation.RealFactory factory =
-      (ExtraFieldPropagation.RealFactory) ExtraFieldPropagation.newFactory(B3Propagation.FACTORY,
-        " x-foo  ");
-    assertThat(factory.fieldNames)
-      .containsExactly("x-foo");
+      .containsExactly(vcapRequestId.name(), amznTraceId.name());
   }
 
   @Test(expected = NullPointerException.class) public void rejectsNull() {
@@ -97,12 +83,12 @@ public class ExtraFieldPropagationTest {
   @Test public void get() {
     TraceContext context = extractWithAmazonTraceId();
 
-    assertThat(ExtraFieldPropagation.get(context, "x-amzn-trace-id"))
+    assertThat(ExtraFieldPropagation.get(context, amznTraceId.name()))
       .isEqualTo(awsTraceId);
   }
 
   @Test public void get_null_if_not_extraField() {
-    assertThat(ExtraFieldPropagation.get(context, "x-amzn-trace-id"))
+    assertThat(ExtraFieldPropagation.get(context, amznTraceId.name()))
       .isNull();
   }
 
@@ -111,27 +97,27 @@ public class ExtraFieldPropagationTest {
 
     try (Tracing t = Tracing.newBuilder().propagationFactory(factory).build();
          Scope scope = t.currentTraceContext().newScope(context)) {
-      assertThat(ExtraFieldPropagation.get("x-amzn-trace-id"))
+      assertThat(ExtraFieldPropagation.get(amznTraceId.name()))
         .isEqualTo(awsTraceId);
     }
   }
 
   @Test public void emptyFields_disallowed() {
     assertThatThrownBy(() -> ExtraFieldPropagation.newFactory(B3Propagation.FACTORY, ""))
-      .hasMessage("fieldNames[0] is empty");
+      .hasMessage("name is empty");
 
     assertThatThrownBy(() -> ExtraFieldPropagation.newFactory(B3Propagation.FACTORY, asList("")))
-      .hasMessage("fieldNames[0] is empty");
+      .hasMessage("name is empty");
 
     assertThatThrownBy(() -> newFactoryBuilder(B3Propagation.FACTORY).addField("").build())
-      .hasMessage("fieldName is empty");
+      .hasMessage("name is empty");
 
     assertThatThrownBy(() -> newFactoryBuilder(B3Propagation.FACTORY).addRedactedField("").build())
-      .hasMessage("fieldName is empty");
+      .hasMessage("name is empty");
 
     assertThatThrownBy(
       () -> newFactoryBuilder(B3Propagation.FACTORY).addPrefixedFields("foo", asList("")).build())
-      .hasMessage("fieldNames[0] is empty");
+      .hasMessage("name is empty");
   }
 
   // We formerly enforced presence of field names in the factory's factory method
@@ -164,78 +150,78 @@ public class ExtraFieldPropagationTest {
 
   @Test public void current_get_null_if_no_current_context() {
     try (Tracing t = Tracing.newBuilder().propagationFactory(factory).build()) {
-      assertThat(ExtraFieldPropagation.get("x-amzn-trace-id"))
+      assertThat(ExtraFieldPropagation.get(amznTraceId.name()))
         .isNull();
     }
   }
 
   @Test public void current_get_null_if_nothing_current() {
-    assertThat(ExtraFieldPropagation.get("x-amzn-trace-id"))
+    assertThat(ExtraFieldPropagation.get(amznTraceId.name()))
       .isNull();
   }
 
   @Test public void current_set() {
     try (Tracing t = Tracing.newBuilder().propagationFactory(factory).build();
          Scope scope = t.currentTraceContext().newScope(context)) {
-      ExtraFieldPropagation.set("x-amzn-trace-id", awsTraceId);
+      ExtraFieldPropagation.set(amznTraceId.name(), awsTraceId);
 
-      assertThat(ExtraFieldPropagation.get("x-amzn-trace-id"))
+      assertThat(ExtraFieldPropagation.get(amznTraceId.name()))
         .isEqualTo(awsTraceId);
     }
   }
 
   @Test public void current_set_noop_if_no_current_context() {
     try (Tracing t = Tracing.newBuilder().propagationFactory(factory).build()) {
-      ExtraFieldPropagation.set("x-amzn-trace-id", awsTraceId); // doesn't throw
+      ExtraFieldPropagation.set(amznTraceId.name(), awsTraceId); // doesn't throw
     }
   }
 
   @Test public void current_set_noop_if_nothing_current() {
-    ExtraFieldPropagation.set("x-amzn-trace-id", awsTraceId); // doesn't throw
+    ExtraFieldPropagation.set(amznTraceId.name(), awsTraceId); // doesn't throw
   }
 
   @Test public void inject_extra() {
-    Extra extra = context.findExtra(Extra.class);
-    extra.put("x-vcap-request-id", uuid);
+    ExtraFields extra = context.findExtra(ExtraFields.class);
+    extra.put(vcapRequestId, uuid);
 
     injector.inject(context, carrier);
 
-    assertThat(carrier).containsEntry("x-vcap-request-id", uuid);
+    assertThat(carrier).containsEntry(vcapRequestId.name(), uuid);
   }
 
   @Test public void inject_two() {
-    Extra extra = context.findExtra(Extra.class);
-    extra.put("x-vcap-request-id", uuid);
-    extra.put("x-amzn-trace-id", awsTraceId);
+    ExtraFields extra = context.findExtra(ExtraFields.class);
+    extra.put(vcapRequestId, uuid);
+    extra.put(amznTraceId, awsTraceId);
 
     injector.inject(context, carrier);
 
     assertThat(carrier)
-      .containsEntry("x-amzn-trace-id", awsTraceId)
-      .containsEntry("x-vcap-request-id", uuid);
+      .containsEntry(amznTraceId.name(), awsTraceId)
+      .containsEntry(vcapRequestId.name(), uuid);
   }
 
   @Test public void inject_prefixed() {
     factory = newFactoryBuilder(B3Propagation.FACTORY)
-      .addField("x-vcap-request-id")
+      .addField(vcapRequestId.name())
       .addPrefixedFields("baggage-", asList("country-code"))
       .build();
     initialize();
 
-    Extra extra = context.findExtra(Extra.class);
-    extra.put("x-vcap-request-id", uuid);
-    extra.put("country-code", "FO");
+    ExtraFields extra = context.findExtra(ExtraFields.class);
+    extra.put(vcapRequestId, uuid);
+    extra.put(ExtraField.create("country-code"), "FO");
 
     injector.inject(context, carrier);
 
     assertThat(carrier)
       .containsEntry("baggage-country-code", "FO")
-      .containsEntry("x-vcap-request-id", uuid);
+      .containsEntry(vcapRequestId.name(), uuid);
   }
 
   @Test public void extract_extra() {
     injector.inject(context, carrier);
-    carrier.put("x-amzn-trace-id", awsTraceId);
+    carrier.put(amznTraceId.name(), awsTraceId);
 
     TraceContextOrSamplingFlags extracted = extractor.extract(carrier);
     assertThat(extracted.context().toBuilder().extra(Collections.emptyList()).build())
@@ -243,15 +229,15 @@ public class ExtraFieldPropagationTest {
     assertThat(extracted.context().extra())
       .hasSize(1);
 
-    Extra extra = (Extra) extracted.context().extra().get(0);
+    ExtraFields extra = (ExtraFields) extracted.context().extra().get(0);
     assertThat(extra.toMap())
-      .containsEntry("x-amzn-trace-id", awsTraceId);
+      .containsEntry(amznTraceId.name(), awsTraceId);
   }
 
   @Test public void extract_two() {
     injector.inject(context, carrier);
-    carrier.put("x-amzn-trace-id", awsTraceId);
-    carrier.put("x-vcap-request-id", uuid);
+    carrier.put(amznTraceId.name(), awsTraceId);
+    carrier.put(vcapRequestId.name(), uuid);
 
     TraceContextOrSamplingFlags extracted = extractor.extract(carrier);
     assertThat(extracted.context().toBuilder().extra(Collections.emptyList()).build())
@@ -259,22 +245,22 @@ public class ExtraFieldPropagationTest {
     assertThat(extracted.context().extra())
       .hasSize(1);
 
-    Extra extra = (Extra) extracted.context().extra().get(0);
+    ExtraFields extra = (ExtraFields) extracted.context().extra().get(0);
     assertThat(extra.toMap())
-      .containsEntry("x-amzn-trace-id", awsTraceId)
-      .containsEntry("x-vcap-request-id", uuid);
+      .containsEntry(amznTraceId.name(), awsTraceId)
+      .containsEntry(vcapRequestId.name(), uuid);
   }
 
   @Test public void extract_prefixed() {
     factory = newFactoryBuilder(B3Propagation.FACTORY)
-      .addField("x-vcap-request-id")
+      .addField(vcapRequestId.name())
       .addPrefixedFields("baggage-", asList("country-code"))
       .build();
     initialize();
 
     injector.inject(context, carrier);
     carrier.put("baggage-country-code", "FO");
-    carrier.put("x-vcap-request-id", uuid);
+    carrier.put(vcapRequestId.name(), uuid);
 
     TraceContextOrSamplingFlags extracted = extractor.extract(carrier);
     assertThat(extracted.context().toBuilder().extra(Collections.emptyList()).build())
@@ -282,10 +268,10 @@ public class ExtraFieldPropagationTest {
     assertThat(extracted.context().extra())
       .hasSize(1);
 
-    Extra extra = (Extra) extracted.context().extra().get(0);
+    ExtraFields extra = (ExtraFields) extracted.context().extra().get(0);
     assertThat(extra.toMap())
       .containsEntry("country-code", "FO")
-      .containsEntry("x-vcap-request-id", uuid);
+      .containsEntry(vcapRequestId.name(), uuid);
   }
 
   @Test public void getAll() {
@@ -293,41 +279,41 @@ public class ExtraFieldPropagationTest {
 
     assertThat(ExtraFieldPropagation.getAll(context))
       .hasSize(1)
-      .containsEntry("x-amzn-trace-id", awsTraceId);
+      .containsEntry(amznTraceId.name(), awsTraceId);
   }
 
   @Test public void getAll_extracted() {
     injector.inject(context, carrier);
-    carrier.put("x-amzn-trace-id", awsTraceId);
+    carrier.put(amznTraceId.name(), awsTraceId);
 
     TraceContextOrSamplingFlags extracted = extractor.extract(carrier);
 
     assertThat(ExtraFieldPropagation.getAll(extracted))
       .hasSize(1)
-      .containsEntry("x-amzn-trace-id", awsTraceId);
+      .containsEntry(amznTraceId.name(), awsTraceId);
   }
 
   @Test public void getAll_extractedWithContext() {
-    carrier.put("x-amzn-trace-id", awsTraceId);
+    carrier.put(amznTraceId.name(), awsTraceId);
 
     TraceContextOrSamplingFlags extracted = extractor.extract(carrier);
 
     assertThat(ExtraFieldPropagation.getAll(extracted))
       .hasSize(1)
-      .containsEntry("x-amzn-trace-id", awsTraceId);
+      .containsEntry(amznTraceId.name(), awsTraceId);
   }
 
   @Test public void getAll_two() {
     injector.inject(context, carrier);
-    carrier.put("x-amzn-trace-id", awsTraceId);
-    carrier.put("x-vcap-request-id", uuid);
+    carrier.put(amznTraceId.name(), awsTraceId);
+    carrier.put(vcapRequestId.name(), uuid);
 
     context = extractor.extract(carrier).context();
 
     assertThat(ExtraFieldPropagation.getAll(context))
       .hasSize(2)
-      .containsEntry("x-amzn-trace-id", awsTraceId)
-      .containsEntry("x-vcap-request-id", uuid);
+      .containsEntry(amznTraceId.name(), awsTraceId)
+      .containsEntry(vcapRequestId.name(), uuid);
   }
 
   @Test public void getAll_empty_if_no_extraField() {
@@ -411,7 +397,7 @@ public class ExtraFieldPropagationTest {
     injector.inject(context, carrier);
 
     // NOTE: the labels are downcased
-    assertThat(carrier).containsExactly(
+    assertThat(carrier).containsOnly(
       entry("b3", B3SingleFormat.writeB3SingleFormat(context)),
       entry("userid", "bob"),
       entry("sessionid", "12345"),
@@ -439,7 +425,7 @@ public class ExtraFieldPropagationTest {
 
   TraceContext extractWithAmazonTraceId() {
     injector.inject(context, carrier);
-    carrier.put("x-amzn-trace-id", awsTraceId);
+    carrier.put(amznTraceId.name(), awsTraceId);
     return extractor.extract(carrier).context();
   }
 }

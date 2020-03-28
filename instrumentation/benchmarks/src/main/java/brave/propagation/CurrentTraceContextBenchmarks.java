@@ -13,6 +13,7 @@
  */
 package brave.propagation;
 
+import brave.context.log4j2.Log4j2Context;
 import brave.context.log4j2.ThreadContextScopeDecorator;
 import java.util.concurrent.TimeUnit;
 import org.openjdk.jmh.annotations.Benchmark;
@@ -29,6 +30,8 @@ import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.options.Options;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
 
+import static brave.propagation.ExtraFieldPropagationBenchmarks.EXTRA_FIELD;
+
 @Measurement(iterations = 5, time = 1)
 @Warmup(iterations = 10, time = 1)
 @Fork(3)
@@ -37,33 +40,29 @@ import org.openjdk.jmh.runner.options.OptionsBuilder;
 @State(Scope.Thread)
 public class CurrentTraceContextBenchmarks {
   static final CurrentTraceContext base = ThreadLocalCurrentTraceContext.create();
+  static final Log4j2Context loggingContext = new Log4j2Context();
   static final CurrentTraceContext log4j2OnlyTraceId = ThreadLocalCurrentTraceContext.newBuilder()
-    .addScopeDecorator(ThreadContextScopeDecorator.newBuilder()
-      .removeField("parentId")
-      .removeField("spanId")
-      .removeField("sampled")
+    .addScopeDecorator(CorrelationFieldScopeDecorator.newBuilder(loggingContext)
+      .clearFields()
+      .addField(CorrelationFields.TRACE_ID)
       .build())
     .build();
   static final CurrentTraceContext log4j2OnlyExtra = ThreadLocalCurrentTraceContext.newBuilder()
-    .addScopeDecorator(ThreadContextScopeDecorator.newBuilder()
-      .removeField("traceId")
-      .removeField("parentId")
-      .removeField("spanId")
-      .removeField("sampled")
-      .addExtraField("user-id")
+    .addScopeDecorator(CorrelationFieldScopeDecorator.newBuilder(loggingContext)
+      .clearFields()
+      .addField(EXTRA_FIELD)
       .build())
     .build();
   static final CurrentTraceContext log4j2 = ThreadLocalCurrentTraceContext.newBuilder()
     .addScopeDecorator(ThreadContextScopeDecorator.create())
     .build();
 
-  static final ExtraFieldPropagation.Factory extraFactory =
-    ExtraFieldPropagation.newFactory(B3Propagation.FACTORY, "user-id");
+  static final Propagation.Factory extraFactory =
+    ExtraFieldPropagation.newFactoryBuilder(B3Propagation.FACTORY).addField(EXTRA_FIELD).build();
 
   static final CurrentTraceContext log4j2Extra = ThreadLocalCurrentTraceContext.newBuilder()
-    .addScopeDecorator(ThreadContextScopeDecorator.newBuilder()
-      .addExtraField("user-id")
-      .build())
+    .addScopeDecorator(CorrelationFieldScopeDecorator.newBuilder(loggingContext)
+      .addField(EXTRA_FIELD).build())
     .build();
 
   static final TraceContext context = extraFactory.decorate(TraceContext.newBuilder()
@@ -74,7 +73,7 @@ public class CurrentTraceContextBenchmarks {
     .build());
 
   static {
-    ExtraFieldPropagation.set(context, "user-id", "romeo");
+    EXTRA_FIELD.setValue(context, "romeo");
   }
 
   final CurrentTraceContext.Scope log4j2Scope = log4j2.newScope(context);

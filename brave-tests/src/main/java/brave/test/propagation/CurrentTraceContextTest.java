@@ -17,7 +17,9 @@ import brave.internal.Nullable;
 import brave.propagation.B3Propagation;
 import brave.propagation.CurrentTraceContext;
 import brave.propagation.CurrentTraceContext.Scope;
+import brave.propagation.ExtraField;
 import brave.propagation.ExtraFieldPropagation;
+import brave.propagation.Propagation;
 import brave.propagation.TraceContext;
 import brave.test.util.ClassLoaders;
 import java.util.concurrent.Callable;
@@ -36,12 +38,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.failBecauseExceptionWasNotThrown;
 
 public abstract class CurrentTraceContextTest {
-  ExtraFieldPropagation.Factory extraFieldFactory =
-    ExtraFieldPropagation.newFactory(B3Propagation.FACTORY, EXTRA_FIELD);
-  protected static final String EXTRA_FIELD = "user-name";
+  protected static final ExtraField.WithCorrelation EXTRA_FIELD =
+    ExtraField.newBuilder("user-id").withCorrelation().build();
+
+  Propagation.Factory extraFactory = ExtraFieldPropagation.newFactoryBuilder(B3Propagation.FACTORY)
+    .addField(EXTRA_FIELD).build();
 
   protected final CurrentTraceContext currentTraceContext;
-  protected final TraceContext context = extraFieldFactory.decorate(
+  protected final TraceContext context = extraFactory.decorate(
     TraceContext.newBuilder().traceIdHigh(-1L).traceId(1L).spanId(1L).sampled(true).build()
   );
   protected final TraceContext notYetSampledContext =
@@ -88,7 +92,7 @@ public abstract class CurrentTraceContextTest {
   @Test public void newScope_noticesDifferentExtraField() {
     try (Scope scope = currentTraceContext.newScope(context)) {
       TraceContext differentExtraField = context.toBuilder().build();
-      ExtraFieldPropagation.set(differentExtraField, EXTRA_FIELD, "foo");
+      EXTRA_FIELD.setValue(differentExtraField, "foo");
 
       try (Scope scope2 = currentTraceContext.newScope(differentExtraField)) {
         assertThat(scope2).isNotEqualTo(Scope.NOOP);
@@ -299,7 +303,7 @@ public abstract class CurrentTraceContextTest {
     }
   }
 
-  @Test public void attachesSpanInRunnable() throws Exception {
+  @Test public void attachesSpanInRunnable() {
     Runnable runnable;
     try (Scope scope = currentTraceContext.newScope(context)) {
       runnable = currentTraceContext.wrap(() -> {

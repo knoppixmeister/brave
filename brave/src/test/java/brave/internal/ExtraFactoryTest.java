@@ -27,7 +27,6 @@ import static java.util.Arrays.asList;
 import static org.assertj.core.api.Assertions.assertThat;
 
 public abstract class ExtraFactoryTest<E, F extends ExtraFactory<E>> {
-
   protected F factory;
   protected Propagation.Factory propagationFactory;
   protected TraceContext context;

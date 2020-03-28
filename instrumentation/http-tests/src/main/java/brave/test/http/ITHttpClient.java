@@ -24,7 +24,6 @@ import brave.http.HttpResponseParser;
 import brave.http.HttpRuleSampler;
 import brave.http.HttpTracing;
 import brave.propagation.CurrentTraceContext.Scope;
-import brave.propagation.ExtraFieldPropagation;
 import brave.propagation.Propagation;
 import brave.propagation.SamplingFlags;
 import brave.propagation.TraceContext;
@@ -122,12 +121,12 @@ public abstract class ITHttpClient<C> extends ITRemote {
 
     TraceContext parent = newTraceContext(SamplingFlags.SAMPLED);
     try (Scope scope = currentTraceContext.newScope(parent)) {
-      ExtraFieldPropagation.set(parent, EXTRA_KEY, "joey");
+      EXTRA_FIELD.setValue(parent, "joey");
       get(client, "/foo");
     }
 
     TraceContext extracted = extract(takeRequest());
-    assertThat(ExtraFieldPropagation.get(extracted, EXTRA_KEY)).isEqualTo("joey");
+    assertThat(EXTRA_FIELD.getValue(extracted)).isEqualTo("joey");
 
     reporter.takeRemoteSpan(Span.Kind.CLIENT);
   }
@@ -137,12 +136,12 @@ public abstract class ITHttpClient<C> extends ITRemote {
 
     TraceContext parent = newTraceContext(SamplingFlags.NOT_SAMPLED);
     try (Scope scope = currentTraceContext.newScope(parent)) {
-      ExtraFieldPropagation.set(parent, EXTRA_KEY, "joey");
+      EXTRA_FIELD.setValue(parent, "joey");
       get(client, "/foo");
     }
 
     TraceContext extracted = extract(takeRequest());
-    assertThat(ExtraFieldPropagation.get(extracted, EXTRA_KEY)).isEqualTo("joey");
+    assertThat(EXTRA_FIELD.getValue(extracted)).isEqualTo("joey");
   }
 
   @Test public void customSampler() throws IOException {

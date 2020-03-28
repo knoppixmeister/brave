@@ -13,10 +13,15 @@
  */
 package brave.internal.propagation;
 
+import brave.internal.CorrelationContext;
 import brave.propagation.B3Propagation;
+import brave.propagation.CorrelationFieldScopeDecorator;
+import brave.propagation.CorrelationFields;
 import brave.propagation.CurrentTraceContext.Scope;
 import brave.propagation.CurrentTraceContext.ScopeDecorator;
+import brave.propagation.ExtraField;
 import brave.propagation.ExtraFieldPropagation;
+import brave.propagation.Propagation;
 import brave.propagation.TraceContext;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -27,11 +32,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.entry;
 import static org.mockito.Mockito.mock;
 
-public class CorrelationFieldScopeDecoratorBuilderTest {
-  static final Map<String, String> ctx = new LinkedHashMap<>();
+public class CorrelationFieldScopeDecoratorTest {
+  static final ExtraField.WithCorrelation EXTRA_FIELD =
+    ExtraField.newBuilder("user-id").withCorrelation().build();
 
-  ExtraFieldPropagation.Factory extraFactory =
-    ExtraFieldPropagation.newFactory(B3Propagation.FACTORY, "user-id");
+  static final Map<String, String> map = new LinkedHashMap<>();
+
+  Propagation.Factory extraFactory = ExtraFieldPropagation.newFactoryBuilder(B3Propagation.FACTORY)
+    .addField(EXTRA_FIELD).build();
 
   TraceContext context = extraFactory.decorate(TraceContext.newBuilder()
     .traceId(1L)
@@ -40,27 +48,22 @@ public class CorrelationFieldScopeDecoratorBuilderTest {
     .sampled(true)
     .build());
 
-  ScopeDecorator decorator = new TestBuilder(ctx).build();
-  ScopeDecorator onlyTraceIdDecorator = new TestBuilder(ctx)
-    .removeField("parentId")
-    .removeField("spanId")
-    .removeField("sampled")
+  ScopeDecorator decorator = CorrelationFieldScopeDecorator.newBuilder(new Context()).build();
+  ScopeDecorator onlyTraceIdDecorator = CorrelationFieldScopeDecorator.newBuilder(new Context())
+    .clearFields()
+    .addField(CorrelationFields.TRACE_ID)
     .build();
-  ScopeDecorator onlyExtraFieldDecorator = new TestBuilder(ctx)
-    .removeField("traceId")
-    .removeField("parentId")
-    .removeField("spanId")
-    .removeField("sampled")
-    .addExtraField("user-id")
+  ScopeDecorator onlyExtraFieldDecorator = CorrelationFieldScopeDecorator.newBuilder(new Context())
+    .clearFields()
+    .addField(EXTRA_FIELD)
     .build();
-
-  ScopeDecorator withExtraFieldDecorator = new TestBuilder(ctx)
-    .addExtraField("user-id")
+  ScopeDecorator withExtraFieldDecorator = CorrelationFieldScopeDecorator.newBuilder(new Context())
+    .addField(EXTRA_FIELD)
     .build();
 
   @Before public void before() {
-    ctx.clear();
-    ExtraFieldPropagation.set(context, "user-id", "romeo");
+    map.clear();
+    EXTRA_FIELD.setValue(context, "romeo");
   }
 
   @Test public void doesntDecorateNoop() {
@@ -72,51 +75,51 @@ public class CorrelationFieldScopeDecoratorBuilderTest {
 
   @Test public void addsAndRemoves() {
     Scope decorated = decorator.decorateScope(context, mock(Scope.class));
-    assertThat(ctx).containsExactly(
+    assertThat(map).containsExactly(
       entry("traceId", "0000000000000001"),
       entry("parentId", "0000000000000002"),
       entry("spanId", "0000000000000003"),
       entry("sampled", "true")
     );
     decorated.close();
-    assertThat(ctx.isEmpty());
+    assertThat(map.isEmpty());
   }
 
   @Test public void addsAndRemoves_onlyTraceId() {
     Scope decorated = onlyTraceIdDecorator.decorateScope(context, mock(Scope.class));
-    assertThat(ctx).containsExactly(entry("traceId", "0000000000000001"));
+    assertThat(map).containsExactly(entry("traceId", "0000000000000001"));
     decorated.close();
-    assertThat(ctx.isEmpty());
+    assertThat(map.isEmpty());
   }
 
   @Test public void addsAndRemoves_onlyExtraField() {
     Scope decorated = onlyExtraFieldDecorator.decorateScope(context, mock(Scope.class));
-    assertThat(ctx).containsExactly(entry("user-id", "romeo"));
+    assertThat(map).containsExactly(entry(EXTRA_FIELD.name(), "romeo"));
     decorated.close();
-    assertThat(ctx.isEmpty());
+    assertThat(map.isEmpty());
   }
 
   @Test public void addsAndRemoves_withExtraField() {
     Scope decorated = withExtraFieldDecorator.decorateScope(context, mock(Scope.class));
-    assertThat(ctx).containsExactly(
+    assertThat(map).containsExactly(
       entry("traceId", "0000000000000001"),
       entry("parentId", "0000000000000002"),
       entry("spanId", "0000000000000003"),
       entry("sampled", "true"),
-      entry("user-id", "romeo")
+      entry(EXTRA_FIELD.name(), "romeo")
     );
     decorated.close();
-    assertThat(ctx.isEmpty());
+    assertThat(map.isEmpty());
   }
 
   @Test public void revertsChanges() {
-    ctx.put("traceId", "000000000000000a");
-    ctx.put("parentId", "000000000000000b");
-    ctx.put("spanId", "000000000000000c");
-    ctx.put("sampled", "false");
+    map.put("traceId", "000000000000000a");
+    map.put("parentId", "000000000000000b");
+    map.put("spanId", "000000000000000c");
+    map.put("sampled", "false");
 
     Scope decorated = decorator.decorateScope(context, mock(Scope.class));
-    assertThat(ctx).containsExactly(
+    assertThat(map).containsExactly(
       entry("traceId", "0000000000000001"),
       entry("parentId", "0000000000000002"),
       entry("spanId", "0000000000000003"),
@@ -124,7 +127,7 @@ public class CorrelationFieldScopeDecoratorBuilderTest {
     );
     decorated.close();
 
-    assertThat(ctx).containsExactly(
+    assertThat(map).containsExactly(
       entry("traceId", "000000000000000a"),
       entry("parentId", "000000000000000b"),
       entry("spanId", "000000000000000c"),
@@ -133,54 +136,54 @@ public class CorrelationFieldScopeDecoratorBuilderTest {
   }
 
   @Test public void revertsChanges_onlyTraceId() {
-    ctx.put("traceId", "000000000000000a");
+    map.put("traceId", "000000000000000a");
 
     Scope decorated = onlyTraceIdDecorator.decorateScope(context, mock(Scope.class));
-    assertThat(ctx).containsExactly(entry("traceId", "0000000000000001"));
+    assertThat(map).containsExactly(entry("traceId", "0000000000000001"));
     decorated.close();
 
-    assertThat(ctx).containsExactly(entry("traceId", "000000000000000a"));
+    assertThat(map).containsExactly(entry("traceId", "000000000000000a"));
   }
 
   @Test public void revertsChanges_onlyExtraField() {
-    ctx.put("user-id", "bob");
+    map.put(EXTRA_FIELD.name(), "bob");
 
     Scope decorated = onlyExtraFieldDecorator.decorateScope(context, mock(Scope.class));
-    assertThat(ctx).containsExactly(entry("user-id", "romeo"));
+    assertThat(map).containsExactly(entry(EXTRA_FIELD.name(), "romeo"));
     decorated.close();
 
-    assertThat(ctx).containsExactly(entry("user-id", "bob"));
+    assertThat(map).containsExactly(entry(EXTRA_FIELD.name(), "bob"));
   }
 
   @Test public void revertsChanges_withExtraField() {
-    ctx.put("traceId", "000000000000000a");
-    ctx.put("parentId", "000000000000000b");
-    ctx.put("spanId", "000000000000000c");
-    ctx.put("sampled", "false");
-    ctx.put("user-id", "bob");
+    map.put("traceId", "000000000000000a");
+    map.put("parentId", "000000000000000b");
+    map.put("spanId", "000000000000000c");
+    map.put("sampled", "false");
+    map.put(EXTRA_FIELD.name(), "bob");
 
     Scope decorated = withExtraFieldDecorator.decorateScope(context, mock(Scope.class));
-    assertThat(ctx).containsExactly(
+    assertThat(map).containsExactly(
       entry("traceId", "0000000000000001"),
       entry("parentId", "0000000000000002"),
       entry("spanId", "0000000000000003"),
       entry("sampled", "true"),
-      entry("user-id", "romeo")
+      entry(EXTRA_FIELD.name(), "romeo")
     );
     decorated.close();
 
-    assertThat(ctx).containsExactly(
+    assertThat(map).containsExactly(
       entry("traceId", "000000000000000a"),
       entry("parentId", "000000000000000b"),
       entry("spanId", "000000000000000c"),
       entry("sampled", "false"),
-      entry("user-id", "bob")
+      entry(EXTRA_FIELD.name(), "bob")
     );
   }
 
   @Test public void revertsLateChanges() {
     Scope decorated = decorator.decorateScope(context, mock(Scope.class));
-    assertThat(ctx).containsExactly(
+    assertThat(map).containsExactly(
       entry("traceId", "0000000000000001"),
       entry("parentId", "0000000000000002"),
       entry("spanId", "0000000000000003"),
@@ -188,77 +191,73 @@ public class CorrelationFieldScopeDecoratorBuilderTest {
     );
 
     // late changes
-    ctx.put("traceId", "000000000000000a");
-    ctx.put("parentId", "000000000000000b");
-    ctx.put("spanId", "000000000000000c");
-    ctx.put("sampled", "false");
+    map.put("traceId", "000000000000000a");
+    map.put("parentId", "000000000000000b");
+    map.put("spanId", "000000000000000c");
+    map.put("sampled", "false");
 
     decorated.close();
 
-    assertThat(ctx).isEmpty();
+    assertThat(map).isEmpty();
   }
 
   @Test public void revertsLateChanges_onlyTraceId() {
     Scope decorated = onlyTraceIdDecorator.decorateScope(context, mock(Scope.class));
-    assertThat(ctx).containsExactly(entry("traceId", "0000000000000001"));
+    assertThat(map).containsExactly(entry("traceId", "0000000000000001"));
 
     // late changes
-    ctx.put("traceId", "000000000000000a");
+    map.put("traceId", "000000000000000a");
 
     decorated.close();
 
-    assertThat(ctx).isEmpty();
+    assertThat(map).isEmpty();
   }
 
   @Test public void revertsLateChanges_onlyExtraField() {
     Scope decorated = onlyExtraFieldDecorator.decorateScope(context, mock(Scope.class));
-    assertThat(ctx).containsExactly(entry("user-id", "romeo"));
+    assertThat(map).containsExactly(entry(EXTRA_FIELD.name(), "romeo"));
 
     // late changes
-    ctx.put("user-id", "bob");
+    map.put(EXTRA_FIELD.name(), "bob");
 
     decorated.close();
 
-    assertThat(ctx).isEmpty();
+    assertThat(map).isEmpty();
   }
 
   @Test public void revertsLateChanges_withExtraField() {
     Scope decorated = withExtraFieldDecorator.decorateScope(context, mock(Scope.class));
-    assertThat(ctx).containsExactly(
+    assertThat(map).containsExactly(
       entry("traceId", "0000000000000001"),
       entry("parentId", "0000000000000002"),
       entry("spanId", "0000000000000003"),
       entry("sampled", "true"),
-      entry("user-id", "romeo")
+      entry(EXTRA_FIELD.name(), "romeo")
     );
 
     // late changes
-    ctx.put("traceId", "000000000000000a");
-    ctx.put("parentId", "000000000000000b");
-    ctx.put("spanId", "000000000000000c");
-    ctx.put("sampled", "false");
-    ctx.put("user-id", "bob");
+    map.put("traceId", "000000000000000a");
+    map.put("parentId", "000000000000000b");
+    map.put("spanId", "000000000000000c");
+    map.put("sampled", "false");
+    map.put(EXTRA_FIELD.name(), "bob");
 
     decorated.close();
 
-    assertThat(ctx).isEmpty();
+    assertThat(map).isEmpty();
   }
 
-  static class TestBuilder extends CorrelationFieldScopeDecoratorBuilder<TestBuilder> {
-    TestBuilder(Map<String, String> context) {
-      super(new Context() {
-        @Override public String get(String name) {
-          return context.get(name);
-        }
+  final class Context extends CorrelationContext {
+    @Override public String get(String name) {
+      return map.get(name);
+    }
 
-        @Override public void put(String name, String value) {
-          context.put(name, value);
-        }
+    @Override public void put(String name, String value) {
+      map.put(name, value);
+    }
 
-        @Override public void remove(String name) {
-          context.remove(name);
-        }
-      });
+    @Override public void remove(String name) {
+      map.remove(name);
     }
   }
 }

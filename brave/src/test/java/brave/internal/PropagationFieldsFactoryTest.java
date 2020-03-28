@@ -25,8 +25,8 @@ import zipkin2.reporter.Reporter;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.entry;
 
-public abstract class PropagationFieldsFactoryTest<K, V, P extends PropagationFields<K, V>>
-  extends ExtraFactoryTest<P, PropagationFieldsFactory<K, V, P>> {
+public abstract class PropagationFieldsFactoryTest<K, V, P extends PropagationFields<K, V>,
+  F extends PropagationFieldsFactory<K, V, P>> extends ExtraFactoryTest<P, F> {
   protected final K keyOne, keyTwo;
   protected final V valueOne, valueTwo, valueThree;
 
@@ -127,8 +127,8 @@ public abstract class PropagationFieldsFactoryTest<K, V, P extends PropagationFi
           .hasSize(1);
         PropagationFields<K, V> fields = ((PropagationFields<K, V>) context1.extra().get(0));
         assertThat(fields.toMap()).containsExactly(
-          entry(keyOne, valueTwo),
-          entry(keyTwo, valueThree)
+          entry(keyOne.toString(), valueTwo),
+          entry(keyTwo.toString(), valueThree)
         );
         assertThat(fields).extracting("traceId", "spanId")
           .containsExactly(context1.traceId(), context1.spanId());
@@ -157,7 +157,7 @@ public abstract class PropagationFieldsFactoryTest<K, V, P extends PropagationFi
 
         PropagationFields<K, V> fields = ((PropagationFields<K, V>) context1.extra().get(0));
         assertThat(fields.toMap())
-          .containsEntry(keyTwo, valueThree);
+          .containsEntry(keyTwo.toString(), valueThree);
         assertThat(fields).extracting("traceId", "spanId")
           .containsExactly(context1.traceId(), context1.spanId());
       } finally {
@@ -184,7 +184,7 @@ public abstract class PropagationFieldsFactoryTest<K, V, P extends PropagationFi
 
         PropagationFields<K, V> fields = ((PropagationFields<K, V>) context1.extra().get(0));
         assertThat(fields.toMap())
-          .containsEntry(keyOne, valueOne);
+          .containsEntry(keyOne.toString(), valueOne);
         assertThat(fields).extracting("traceId", "spanId")
           .containsExactly(context1.traceId(), context1.spanId());
       } finally {
@@ -232,7 +232,7 @@ public abstract class PropagationFieldsFactoryTest<K, V, P extends PropagationFi
 
     assertThat(fields.toMap())
       .hasSize(1)
-      .containsEntry(keyTwo, valueThree);
+      .containsEntry(keyTwo.toString(), valueThree);
   }
 
   @Test public void toMap_two() {
@@ -242,8 +242,8 @@ public abstract class PropagationFieldsFactoryTest<K, V, P extends PropagationFi
 
     assertThat(fields.toMap())
       .hasSize(2)
-      .containsEntry(keyOne, valueOne)
-      .containsEntry(keyTwo, valueThree);
+      .containsEntry(keyOne.toString(), valueOne)
+      .containsEntry(keyTwo.toString(), valueThree);
   }
 
   @Test public void toString_one() {
