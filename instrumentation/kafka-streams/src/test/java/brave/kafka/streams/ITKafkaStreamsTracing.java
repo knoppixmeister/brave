@@ -310,7 +310,7 @@ public class ITKafkaStreamsTracing extends ITKafkaStreams {
       .transformValues(kafkaStreamsTracing.peek("transform1", (o, o2) -> {
         TraceContext context = currentTraceContext.get();
         assertThat(EXTRA_FIELD.getValue(context)).isEqualTo("user1");
-        EXTRA_FIELD.setValue(context, "user2");
+        EXTRA_FIELD.updateValue(context, "user2");
       }))
       .transformValues(kafkaStreamsTracing.peek("transform2", (s, s2) -> {
         TraceContext context = currentTraceContext.get();

@@ -121,7 +121,7 @@ public abstract class ITHttpClient<C> extends ITRemote {
 
     TraceContext parent = newTraceContext(SamplingFlags.SAMPLED);
     try (Scope scope = currentTraceContext.newScope(parent)) {
-      EXTRA_FIELD.setValue(parent, "joey");
+      EXTRA_FIELD.updateValue(parent, "joey");
       get(client, "/foo");
     }
 
@@ -136,7 +136,7 @@ public abstract class ITHttpClient<C> extends ITRemote {
 
     TraceContext parent = newTraceContext(SamplingFlags.NOT_SAMPLED);
     try (Scope scope = currentTraceContext.newScope(parent)) {
-      EXTRA_FIELD.setValue(parent, "joey");
+      EXTRA_FIELD.updateValue(parent, "joey");
       get(client, "/foo");
     }
 

@@ -93,7 +93,7 @@ final class BraveSpan implements io.opentracing.Span {
   }
 
   @Override public io.opentracing.Span setBaggageItem(String key, String value) {
-    ExtraField.setValue(delegate.context(), key, value);
+    ExtraField.updateValue(delegate.context(), key, value);
     return this;
   }
 

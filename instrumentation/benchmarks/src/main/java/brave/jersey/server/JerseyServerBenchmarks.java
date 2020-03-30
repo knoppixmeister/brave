@@ -44,7 +44,7 @@ public class JerseyServerBenchmarks extends HttpServerBenchmarks {
   public static class Resource {
     @GET @Produces("text/plain; charset=UTF-8") public String get() {
       // noop if not configured
-      EXTRA_FIELD.setValue("FO");
+      EXTRA_FIELD.updateValue("FO");
       return "hello world";
     }
   }

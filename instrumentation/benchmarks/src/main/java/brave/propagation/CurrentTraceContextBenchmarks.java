@@ -71,7 +71,7 @@ public class CurrentTraceContextBenchmarks {
     .build());
 
   static {
-    EXTRA_FIELD.setValue(context, "romeo");
+    EXTRA_FIELD.updateValue(context, "romeo");
   }
 
   final CurrentTraceContext.Scope log4j2Scope = log4j2.newScope(context);

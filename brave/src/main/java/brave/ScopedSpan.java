@@ -48,7 +48,7 @@ public abstract class ScopedSpan {
 
   /** Returns the trace context associated with this span */
   // This api is exposed as there's always a context in scope by definition, and the context is
-  // needed for methods like ExtraField.setValue
+  // needed for methods like ExtraField.updateValue
   public abstract TraceContext context();
 
   /**

@@ -46,7 +46,7 @@ public class ServletBenchmarks extends HttpServerBenchmarks {
     @Override protected void doGet(HttpServletRequest req, HttpServletResponse resp)
       throws IOException {
       // noop if not configured
-      EXTRA_FIELD.setValue("FO");
+      EXTRA_FIELD.updateValue("FO");
       resp.addHeader("Content-Type", "text/plain; charset=UTF-8");
       resp.getWriter().println("hello world");
     }

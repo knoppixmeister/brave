@@ -40,10 +40,10 @@ import static java.util.Arrays.asList;
  * spanCustomizer.tag("country-code", ExtraField.getValue("country-code"));
  *
  * // You can also update the value similarly, so that the new value will propagate downstream.
- * countryCode.setValue("FO");
- * countryCode.setValue(context, "FO");
- * ExtraField.setValue("country-code", "FO");
- * ExtraField.setValue(context, "country-code", "FO");
+ * countryCode.updateValue("FO");
+ * countryCode.updateValue(context, "FO");
+ * ExtraField.updateValue("country-code", "FO");
+ * ExtraField.updateValue(context, "country-code", "FO");
  * }</pre>
  *
  * <h3>Correlation</h3>
@@ -79,7 +79,7 @@ import static java.util.Arrays.asList;
  * countryCode = ExtraField.newBuilder("country-code").prefix("baggage-").build();
  *
  * // Later, you can call below to affect the country code of the current trace context
- * ExtraField.setValue("country-code", "FO");
+ * ExtraField.updateValue("country-code", "FO");
  * String countryCode = ExtraField.getValue("country-code");
  * }</pre>
  *
@@ -149,29 +149,30 @@ public class ExtraField {
   }
 
   /**
-   * Like {@link #setValue(TraceContext, String)} except looks up the field by {@linkplain
+   * Like {@link #updateValue(TraceContext, String)} except looks up the field by {@linkplain
    * #name()}.
    *
-   * <p>Prefer using {@link #setValue(TraceContext, String)} when you have a reference to the
+   * <p>Prefer using {@link #updateValue(TraceContext, String)} when you have a reference to the
    * underlying field.
    */
-  public static void setValue(TraceContext context, String name, String value) {
+  public static void updateValue(TraceContext context, String name, String value) {
     PropagationFields.put(context, ExtraField.create(name), value, ExtraFields.class);
   }
 
   /**
-   * Like {@link #setValue(TraceContext, String, String)} except against the current trace context.
-   *
-   * <p>Prefer using {@link ExtraField#setValue(String)} when you have a reference to the
-   * underlying field.
-   * <p>Prefer {@link #setValue(TraceContext, String, String)} if you have a reference to the trace
+   * Like {@link #updateValue(TraceContext, String, String)} except against the current trace
    * context.
+   *
+   * <p>Prefer using {@link ExtraField#updateValue(String)} when you have a reference to the
+   * underlying field.
+   * <p>Prefer {@link #updateValue(TraceContext, String, String)} if you have a reference to the
+   * trace context.
    *
    * @see ExtraField#name()
    */
-  public static void setValue(String name, String value) {
+  public static void updateValue(String name, String value) {
     TraceContext context = currentTraceContext();
-    if (context != null) setValue(context, name, value);
+    if (context != null) updateValue(context, name, value);
   }
 
   /** @since 5.11 */
@@ -236,24 +237,15 @@ public class ExtraField {
     }
 
     /**
-     * When set, the field will be added to the correlation context on {@link
-     * CorrelationFieldScopeDecorator#decorateScope(TraceContext, CurrentTraceContext.Scope)}.
+     * Adds this field to the correlation context on {@link CorrelationFieldScopeDecorator#decorateScope(TraceContext,
+     * CurrentTraceContext.Scope)}.
      *
-     * <h3>Immediate flushing</h3>
-     * <p>This will also immediately flush a value update to the correlation context on {@link
-     * #setValue(String)} as opposed waiting for the next scope decoration.
+     * <p>For example, if using log correlation and an extra field named {@link #name() named}
+     * "userId", the extracted value becomes the log variable {@code %{userId}} when the span is
+     * next made current.
      *
-     * <p>This is useful for callbacks that have a void return. Ex.
-     * <pre>{@code
-     * static final ExtraField BUSINESS_PROCESS = ExtraField.newBuilder("bp").withCorrelation().build();
-     *
-     * @SendTo(SourceChannels.OUTPUT)
-     * public void timerMessageSource() {
-     *   BUSINESS_PROCESS.setValue("accounting");
-     *   // Assuming a Log4j context, the expression %{bp} will show "accounting" in businessCode()
-     *   businessCode();
-     * }
-     * }</pre>
+     * <p><em>Note:</em>Updates after extraction are not synchronized unless {@link
+     * CorrelationBuilder#flushOnUpdate()} is invoked.
      *
      * @since 5.11
      */
@@ -269,8 +261,35 @@ public class ExtraField {
 
   /** Used to make an extra field for {@link CorrelationFieldScopeDecorator} */
   public static class CorrelationBuilder extends Builder {
+    boolean flushOnUpdate = false;
+
     CorrelationBuilder(Builder builder) {
       super(builder);
+    }
+
+    @Override public CorrelationBuilder withCorrelation() {
+      return this;
+    }
+
+    /**
+     * Call this to immediately flush a {@linkplain #updateValue(String, String) value update} to
+     * the correlation context as opposed waiting for the next scope decoration.
+     *
+     * <p>This is useful for callbacks that have a void return. Ex.
+     * <pre>{@code
+     * static final ExtraField BUSINESS_PROCESS = ExtraField.newBuilder("bp").withCorrelation().build();
+     *
+     * @SendTo(SourceChannels.OUTPUT)
+     * public void timerMessageSource() {
+     *   BUSINESS_PROCESS.updateValue("accounting");
+     *   // Assuming a Log4j context, the expression %{bp} will show "accounting" in businessCode()
+     *   businessCode();
+     * }
+     * }</pre>
+     */
+    public CorrelationBuilder flushOnUpdate() {
+      this.flushOnUpdate = true;
+      return this;
     }
 
     /** @see Builder#redacted() */
@@ -325,13 +344,18 @@ public class ExtraField {
     redacted = builder.redacted;
   }
 
-  /** Extracts the most recent value for this field in the context or null if unavailable. */
+  /**
+   * Returns the most recent value for this field in the context or null if unavailable.
+   *
+   * <p>The result may not be the same as the one {@link TraceContext.Extractor#extract(Object)
+   * extracted} from the incoming context because {@link #updateValue(String)} can override it.
+   */
   @Nullable public String getValue(TraceContext context) {
     return PropagationFields.get(context, this, ExtraFields.class);
   }
 
-  /** Sets the value of the this field, or ignores if not configured. */
-  public void setValue(TraceContext context, String value) {
+  /** Updates the value of the this field, or ignores if not configured. */
+  public void updateValue(TraceContext context, String value) {
     PropagationFields.put(context, this, value, ExtraFields.class);
   }
 
@@ -346,14 +370,14 @@ public class ExtraField {
   }
 
   /**
-   * Like {@link #setValue(TraceContext, String)} except against the current trace context.
+   * Like {@link #updateValue(TraceContext, String)} except against the current trace context.
    *
-   * <p>Prefer {@link #setValue(TraceContext, String)} if you have a reference to the trace
+   * <p>Prefer {@link #updateValue(TraceContext, String)} if you have a reference to the trace
    * context.
    */
-  public void setValue(String value) {
+  public void updateValue(String value) {
     TraceContext context = currentTraceContext();
-    if (context != null) setValue(context, value);
+    if (context != null) updateValue(context, value);
   }
 
   /** The non-empty name of the field. Ex "userId" */

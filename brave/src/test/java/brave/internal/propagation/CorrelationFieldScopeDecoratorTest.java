@@ -63,7 +63,7 @@ public class CorrelationFieldScopeDecoratorTest {
 
   @Before public void before() {
     map.clear();
-    EXTRA_FIELD.setValue(context, "romeo");
+    EXTRA_FIELD.updateValue(context, "romeo");
   }
 
   @Test public void doesntDecorateNoop() {

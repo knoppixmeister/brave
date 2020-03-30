@@ -57,7 +57,7 @@ public class JaxRs2ServerBenchmarks extends HttpServerBenchmarks {
     @GET @Path("/tracedextra")
     public String tracedextra() {
       // noop if not configured
-      EXTRA_FIELD.setValue("FO");
+      EXTRA_FIELD.updateValue("FO");
       return "hello world";
     }
 

@@ -81,7 +81,7 @@ public class SparkBenchmarks extends HttpServerBenchmarks {
     public void init() {
       Spark.before(sparkTracing.before());
       Spark.get("/tracedextra", (Request request, Response response) -> {
-        EXTRA_FIELD.setValue("FO");
+        EXTRA_FIELD.updateValue("FO");
         return "hello world";
       });
       Spark.afterAfter(sparkTracing.afterAfter());

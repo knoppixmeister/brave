@@ -726,7 +726,7 @@ public class TracerTest {
     propagationFactory = extraFactory;
 
     TraceContext context = tracer.nextSpan().context();
-    EXTRA_FIELD.setValue(context, "napkin");
+    EXTRA_FIELD.updateValue(context, "napkin");
 
     TraceContext joined = tracer.joinSpan(context).context();
 
@@ -737,7 +737,7 @@ public class TracerTest {
     propagationFactory = extraFactory;
 
     Span parent = tracer.nextSpan();
-    EXTRA_FIELD.setValue(parent.context(), "napkin");
+    EXTRA_FIELD.updateValue(parent.context(), "napkin");
 
     TraceContext nextSpan;
     try (SpanInScope scope = tracer.withSpanInScope(parent)) {
@@ -751,7 +751,7 @@ public class TracerTest {
     propagationFactory = extraFactory;
 
     TraceContext context = tracer.nextSpan().context();
-    EXTRA_FIELD.setValue(context, "napkin");
+    EXTRA_FIELD.updateValue(context, "napkin");
 
     TraceContext newChild = tracer.newChild(context).context();
 
@@ -762,7 +762,7 @@ public class TracerTest {
     propagationFactory = extraFactory;
 
     TraceContext context = tracer.nextSpan().context();
-    EXTRA_FIELD.setValue(context, "napkin");
+    EXTRA_FIELD.updateValue(context, "napkin");
 
     ScopedSpan scoped = tracer.startScopedSpanWithParent("foo", context);
     scoped.finish();
@@ -774,7 +774,7 @@ public class TracerTest {
     propagationFactory = extraFactory;
 
     Span parent = tracer.nextSpan();
-    EXTRA_FIELD.setValue(parent.context(), "napkin");
+    EXTRA_FIELD.updateValue(parent.context(), "napkin");
 
     ScopedSpan scoped;
     try (SpanInScope scope = tracer.withSpanInScope(parent)) {

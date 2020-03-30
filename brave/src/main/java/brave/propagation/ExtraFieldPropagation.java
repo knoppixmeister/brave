@@ -169,14 +169,14 @@ public class ExtraFieldPropagation<K> implements Propagation<K> {
     return ExtraField.getValue(name);
   }
 
-  /** @deprecated Since 5.11 use {@link ExtraField#setValue(TraceContext, String, String)} */
+  /** @deprecated Since 5.11 use {@link ExtraField#updateValue(TraceContext, String, String)} */
   @Deprecated public static void set(TraceContext context, String name, String value) {
-    ExtraField.setValue(context, name, value);
+    ExtraField.updateValue(context, name, value);
   }
 
-  /** @deprecated Since 5.11 use {@link ExtraField#setValue(String, String)} */
+  /** @deprecated Since 5.11 use {@link ExtraField#updateValue(String, String)} */
   @Deprecated public static void set(String name, String value) {
-    ExtraField.setValue(name, value);
+    ExtraField.updateValue(name, value);
   }
 
   /**

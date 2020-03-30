@@ -104,7 +104,7 @@ public class ITTracingFilter_Consumer extends ITTracingFilter {
   @Test public void propagatesExtra() {
     TraceContext parent = newTraceContext(SamplingFlags.SAMPLED);
     try (Scope scope = currentTraceContext.newScope(parent)) {
-      EXTRA_FIELD.setValue(parent, "joey");
+      EXTRA_FIELD.updateValue(parent, "joey");
       client.get().sayHello("jorge");
     }
 
@@ -117,7 +117,7 @@ public class ITTracingFilter_Consumer extends ITTracingFilter {
   @Test public void propagatesExtra_unsampled() {
     TraceContext parent = newTraceContext(SamplingFlags.NOT_SAMPLED);
     try (Scope scope = currentTraceContext.newScope(parent)) {
-      EXTRA_FIELD.setValue(parent, "joey");
+      EXTRA_FIELD.updateValue(parent, "joey");
       client.get().sayHello("jorge");
     }
 

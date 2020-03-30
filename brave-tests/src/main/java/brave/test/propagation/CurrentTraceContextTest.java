@@ -92,7 +92,7 @@ public abstract class CurrentTraceContextTest {
   @Test public void newScope_noticesDifferentExtraField() {
     try (Scope scope = currentTraceContext.newScope(context)) {
       TraceContext differentExtraField = context.toBuilder().build();
-      EXTRA_FIELD.setValue(differentExtraField, "foo");
+      EXTRA_FIELD.updateValue(differentExtraField, "foo");
 
       try (Scope scope2 = currentTraceContext.newScope(differentExtraField)) {
         assertThat(scope2).isNotEqualTo(Scope.NOOP);
