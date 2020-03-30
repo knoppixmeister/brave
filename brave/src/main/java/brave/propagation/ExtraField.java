@@ -300,7 +300,7 @@ public class ExtraField {
       return this;
     }
 
-    /** @see Builder#redacted() */
+    /** @see Builder#addKey() */
     public CorrelationBuilder addKey(String key) {
       super.addKey(key);
       return this;
