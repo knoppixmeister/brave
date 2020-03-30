@@ -244,9 +244,6 @@ public class ExtraField {
      * "userId", the extracted value becomes the log variable {@code %{userId}} when the span is
      * next made current.
      *
-     * <p><em>Note:</em>Updates after extraction are not synchronized unless {@link
-     * CorrelationBuilder#flushOnUpdate()} is invoked.
-     *
      * @since 5.11
      */
     public CorrelationBuilder withCorrelation() {
@@ -259,7 +256,7 @@ public class ExtraField {
     }
   }
 
-  /** Used to make an extra field for {@link CorrelationFieldScopeDecorator} */
+  /** Used to make an extra field integrated with {@link CorrelationFieldScopeDecorator} */
   public static class CorrelationBuilder extends Builder {
     boolean flushOnUpdate = false;
 
@@ -272,20 +269,25 @@ public class ExtraField {
     }
 
     /**
-     * Call this to immediately flush a {@linkplain #updateValue(String, String) value update} to
-     * the correlation context as opposed waiting for the next scope decoration.
+     * Flushes an updated value to the correlation context when {@linkplain #updateValue(String,
+     * String)} is invoked.
      *
-     * <p>This is useful for callbacks that have a void return. Ex.
+     * <p>Ex.
      * <pre>{@code
-     * static final ExtraField BUSINESS_PROCESS = ExtraField.newBuilder("bp").withCorrelation().build();
+     * static final ExtraField BUSINESS_PROCESS = ExtraField.newBuilder("bp")
+     *                                                      .withCorrelation()
+     *                                                      .flushOnUpdate()
+     *                                                      .build();
      *
      * @SendTo(SourceChannels.OUTPUT)
      * public void timerMessageSource() {
-     *   BUSINESS_PROCESS.updateValue("accounting");
+     *   BUSINESS_PROCESS.updateValue("accounting"); // implicitly flushes
      *   // Assuming a Log4j context, the expression %{bp} will show "accounting" in businessCode()
      *   businessCode();
      * }
      * }</pre>
+     *
+     * @see CorrelationField.Updatable#flushOnUpdate()
      */
     public CorrelationBuilder flushOnUpdate() {
       this.flushOnUpdate = true;
@@ -316,17 +318,31 @@ public class ExtraField {
     }
   }
 
-  public static final class WithCorrelation extends ExtraField implements CorrelationField {
-    WithCorrelation(Builder builder) {
+  public static class WithCorrelation extends ExtraField implements CorrelationField.Updatable {
+    final boolean flushOnUpdate;
+
+    @Override public void updateValue(TraceContext context, String value) {
+      super.updateValue(context, value);
+      if (flushOnUpdate) CorrelationFieldScopeDecorator.flush(this, value);
+    }
+
+    WithCorrelation(CorrelationBuilder builder) {
       super(builder);
+      this.flushOnUpdate = builder.flushOnUpdate;
     }
 
     @Override public String name() {
       return name;
     }
 
+    @Override public boolean flushOnUpdate() {
+      return flushOnUpdate;
+    }
+
     @Override public CorrelationBuilder toBuilder() {
-      return new Builder(this).withCorrelation();
+      CorrelationBuilder result = new Builder(this).withCorrelation();
+      if (flushOnUpdate) result.flushOnUpdate();
+      return result;
     }
   }
 
@@ -355,7 +371,7 @@ public class ExtraField {
   }
 
   /** Updates the value of the this field, or ignores if not configured. */
-  public void updateValue(TraceContext context, String value) {
+  public void updateValue(TraceContext context, @Nullable String value) {
     PropagationFields.put(context, this, value, ExtraFields.class);
   }
 

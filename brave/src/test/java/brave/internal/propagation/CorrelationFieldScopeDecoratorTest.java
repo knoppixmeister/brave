@@ -67,6 +67,9 @@ public class CorrelationFieldScopeDecoratorTest {
   }
 
   @Test public void doesntDecorateNoop() {
+    // current scope (null) has no extra field, so a null value for the extra field implies noop
+    EXTRA_FIELD.updateValue(context, null);
+
     assertThat(decorator.decorateScope(context, Scope.NOOP)).isSameAs(Scope.NOOP);
     assertThat(onlyExtraFieldDecorator.decorateScope(context, Scope.NOOP)).isSameAs(Scope.NOOP);
     assertThat(withExtraFieldDecorator.decorateScope(context, Scope.NOOP)).isSameAs(Scope.NOOP);

@@ -13,6 +13,7 @@
  */
 package brave.propagation;
 
+import brave.internal.Nullable;
 import brave.internal.PropagationFields;
 import brave.internal.PropagationFieldsFactory;
 import java.util.Arrays;
@@ -98,7 +99,7 @@ final class ExtraFields extends PropagationFields<ExtraField, String> {
     return true;
   }
 
-  protected final void put(int index, String value) {
+  protected final void put(int index, @Nullable String value) {
     if (index >= fields.length) return;
 
     synchronized (this) {
@@ -106,12 +107,12 @@ final class ExtraFields extends PropagationFields<ExtraField, String> {
     }
   }
 
-  void doPut(int index, String value) {
+  void doPut(int index, @Nullable String value) {
     String[] elements = values;
     if (elements == null) {
       elements = new String[fields.length];
       elements[index] = value;
-    } else if (value.equals(elements[index])) {
+    } else if (equal(value, elements[index])) {
       return;
     } else { // this is the copy-on-write part
       elements = Arrays.copyOf(elements, elements.length);

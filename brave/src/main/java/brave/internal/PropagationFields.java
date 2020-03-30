@@ -27,7 +27,7 @@ import java.util.Map;
 public abstract class PropagationFields<K, V> {
   protected interface FieldConsumer<K, V> {
     // BiConsumer is Java 1.8+
-    void accept(K key, V value);
+    void accept(K key, @Nullable V value);
   }
 
   long traceId, spanId; // guarded by this
@@ -36,7 +36,7 @@ public abstract class PropagationFields<K, V> {
   protected abstract V get(K key);
 
   /** Replaces the value of the field with the specified key, ignoring if not a permitted field */
-  protected abstract void put(K key, V value);
+  protected abstract void put(K key, @Nullable V value);
 
   /** Invokes the consumer for every non-null field value */
   protected abstract void forEach(FieldConsumer<K, V> consumer);
@@ -81,13 +81,16 @@ public abstract class PropagationFields<K, V> {
   }
 
   /** Replaces the value of the field with the specified key, ignoring if not a permitted field */
-  public static <K, V> void put(TraceContext context, K key, V value,
+  public static <K, V> void put(TraceContext context, K key, @Nullable V value,
     Class<? extends PropagationFields<K, V>> type) {
     if (context == null) throw new NullPointerException("context == null");
     if (key == null) throw new NullPointerException("key == null");
-    if (value == null) throw new NullPointerException("value == null");
     PropagationFields<K, V> fields = context.findExtra(type);
     if (fields == null) return;
     fields.put(key, value);
+  }
+
+  protected static boolean equal(@Nullable Object a, @Nullable Object b) {
+    return a == null ? b == null : a.equals(b); // Java 6 can't use Objects.equals()
   }
 }

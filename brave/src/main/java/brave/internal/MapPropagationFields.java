@@ -59,18 +59,18 @@ public class MapPropagationFields<K, V> extends PropagationFields<K, V> {
     }
   }
 
-  @Override public final void put(K key, V value) {
+  @Override public final void put(K key, @Nullable V value) {
     synchronized (this) {
       Map<K, V> values = this.values;
       if (values == null) {
         values = new LinkedHashMap<>();
-        values.put(key, value);
-      } else if (value.equals(values.get(key))) {
+        if (value != null) values.put(key, value);
+      } else if (equal(value, values.get(key))) {
         return;
       } else {
         // this is the copy-on-write part
         values = new LinkedHashMap<>(values);
-        values.put(key, value);
+        if (value != null) values.put(key, value);
       }
       this.values = Collections.unmodifiableMap(values);
     }
@@ -118,8 +118,6 @@ public class MapPropagationFields<K, V> extends PropagationFields<K, V> {
   @Override public boolean equals(Object o) { // for unit tests
     if (o == this) return true;
     if (!(o instanceof MapPropagationFields)) return false;
-    MapPropagationFields<K, V> that = (MapPropagationFields) o;
-    Map<K, V> values = this.values, thatValues = that.values;
-    return values == null ? thatValues == null : values.equals(thatValues);
+    return equal(this.values, ((MapPropagationFields) o).values);
   }
 }

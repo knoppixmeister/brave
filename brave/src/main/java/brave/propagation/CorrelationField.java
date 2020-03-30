@@ -22,7 +22,7 @@ import brave.internal.Nullable;
  * <p>Field updates only apply during {@linkplain CorrelationFieldScopeDecorator scope
  * decoration}. This means values set do not flush immediately to the underlying correlation context
  * by default. Rather, they are scheduled for the next scope operation. This is a way to control
- * overhead. Use the type {@link Flushable} to allow immediate updates.
+ * overhead. Use the type {@link Updatable} to allow immediate updates.
  *
  * <p>{@link #equals(Object)} and {@link #hashCode()} should be overridden to implement lower-case
  * {@link #name()} comparison.
@@ -40,22 +40,32 @@ public interface CorrelationField {
    */
   @Nullable String getValue(TraceContext context);
 
-  /**
-   * Marks a field such that updates immediately flush to the correlation context, when configured
-   * and their corresponding trace context is current. This has a significant performance impact as
-   * it will invalidate the {@link CurrentTraceContext#maybeScope(TraceContext)} operator.
-   *
-   * <p>Most fields do not change in the scope of a {@link TraceContext}. For example, standard
-   * fields such as {@link CorrelationFields#SPAN_ID the span ID} and {@linkplain
-   * CorrelationFields#constant(String, String) constants} such as env variables do not need to be
-   * tracked. Even field value updates do not necessarily need to be flushed to the underlying
-   * correlation context, as they will apply on the next scope operation.
-   */
-  interface Flushable extends CorrelationField {
+  interface Updatable extends CorrelationField {
     /**
-     * Flushes the most recent value of the field named {@link #name()} into the correlation
-     * context, or ignores if not configured.
+     * MCall this to immediately flush a value update to the correlation context as opposed waiting
+     * for the next scope decoration. This has a significant performance impact as it requires even
+     * {@link CurrentTraceContext#maybeScope(TraceContext)} to always track values.
+     *
+     * <p>This is useful for callbacks that have a void return. Ex.
+     * <pre>{@code
+     * @SendTo(SourceChannels.OUTPUT)
+     * public void timerMessageSource() {
+     *   // Assume BUSINESS_PROCESS is an updatable field
+     *   BUSINESS_PROCESS.updateValue("accounting");
+     *   // Assuming a Log4j context, the expression %{bp} will show "accounting" in businessCode()
+     *   businessCode();
+     * }
+     * }</pre>
+     *
+     * <h3>Appropriate Usage</h3>
+     * <p>Most fields do not change in the scope of a {@link TraceContext}. For example, standard
+     * fields such as {@link CorrelationFields#SPAN_ID the span ID} and {@linkplain
+     * CorrelationFields#constant(String, String) constants} such as env variables do not need to be
+     * tracked. Even field value updates do not necessarily need to be flushed to the underlying
+     * correlation context, as they will apply on the next scope operation.
+     *
+     * @see ExtraField.CorrelationBuilder#flushOnUpdate()
      */
-    void flushValue();
+    boolean flushOnUpdate();
   }
 }
