@@ -23,11 +23,13 @@ import brave.propagation.ExtraField;
 import brave.propagation.ExtraFieldPropagation;
 import brave.propagation.Propagation;
 import brave.propagation.TraceContext;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.junit.Before;
 import org.junit.Test;
 
+import static java.util.Arrays.asList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.entry;
 import static org.mockito.Mockito.mock;
@@ -35,11 +37,15 @@ import static org.mockito.Mockito.mock;
 public class CorrelationFieldScopeDecoratorTest {
   static final ExtraField.WithCorrelation EXTRA_FIELD =
     ExtraField.newBuilder("user-id").withCorrelation().build();
+  static final ExtraField.WithCorrelation EXTRA_FIELD_2 =
+    ExtraField.newBuilder("country-code").withCorrelation().build();
 
   static final Map<String, String> map = new LinkedHashMap<>();
 
   Propagation.Factory extraFactory = ExtraFieldPropagation.newFactoryBuilder(B3Propagation.FACTORY)
-    .addField(EXTRA_FIELD).build();
+    .addField(EXTRA_FIELD)
+    .addField(EXTRA_FIELD_2)
+    .build();
 
   TraceContext context = extraFactory.decorate(TraceContext.newBuilder()
     .traceId(1L)
@@ -57,8 +63,9 @@ public class CorrelationFieldScopeDecoratorTest {
     .clearFields()
     .addField(EXTRA_FIELD)
     .build();
-  ScopeDecorator withExtraFieldDecorator = new TestBuilder()
+  ScopeDecorator withExtraFieldsDecorator = new TestBuilder()
     .addField(EXTRA_FIELD)
+    .addField(EXTRA_FIELD_2)
     .build();
 
   @Before public void before() {
@@ -67,13 +74,53 @@ public class CorrelationFieldScopeDecoratorTest {
   }
 
   @Test public void doesntDecorateNoop() {
-    // current scope (null) has no extra field, so a null value for the extra field implies noop
-    EXTRA_FIELD.updateValue(context, null);
-
     assertThat(decorator.decorateScope(context, Scope.NOOP)).isSameAs(Scope.NOOP);
+    assertThat(decorator.decorateScope(null, Scope.NOOP)).isSameAs(Scope.NOOP);
+  }
+
+  @Test public void doesntDecorateNoop_matchingNullExtraField() {
+    EXTRA_FIELD.updateValue(context, null);
+    EXTRA_FIELD_2.updateValue(context, null);
+    map.put(EXTRA_FIELD.name(), null);
+    map.put(EXTRA_FIELD_2.name(), null);
+
+    assertThat(onlyTraceIdDecorator.decorateScope(context, Scope.NOOP)).isSameAs(Scope.NOOP);
+    assertThat(withExtraFieldsDecorator.decorateScope(context, Scope.NOOP)).isSameAs(Scope.NOOP);
     assertThat(onlyExtraFieldDecorator.decorateScope(context, Scope.NOOP)).isSameAs(Scope.NOOP);
-    assertThat(withExtraFieldDecorator.decorateScope(context, Scope.NOOP)).isSameAs(Scope.NOOP);
+  }
+
+  @Test public void doesntDecorateNoop_matchingExtraField() {
+    EXTRA_FIELD.updateValue(context, "romeo");
+    map.put(EXTRA_FIELD.name(), "romeo");
+    EXTRA_FIELD_2.updateValue(context, "FO");
+    map.put(EXTRA_FIELD_2.name(), "FO");
+
+    assertThat(onlyTraceIdDecorator.decorateScope(context, Scope.NOOP)).isSameAs(Scope.NOOP);
+    assertThat(withExtraFieldsDecorator.decorateScope(context, Scope.NOOP)).isSameAs(Scope.NOOP);
     assertThat(onlyExtraFieldDecorator.decorateScope(context, Scope.NOOP)).isSameAs(Scope.NOOP);
+  }
+
+  /** When a context is in an unexpected state, save off fields and revert. */
+  @Test public void decoratesNoop_unconfiguredFields() {
+    context = context.toBuilder().extra(Collections.emptyList()).build();
+
+    for (ScopeDecorator decorator : asList(withExtraFieldsDecorator, onlyExtraFieldDecorator)) {
+      map.put(EXTRA_FIELD.name(), "romeo");
+      map.put(EXTRA_FIELD_2.name(), "FO");
+
+      assertThat(decorator.decorateScope(context, Scope.NOOP)).isNotSameAs(Scope.NOOP);
+    }
+  }
+
+  @Test public void decoratesNoop_nullMeansClearFields() {
+    context = context.toBuilder().extra(Collections.emptyList()).build();
+
+    for (ScopeDecorator decorator : asList(withExtraFieldsDecorator, onlyExtraFieldDecorator)) {
+      map.put(EXTRA_FIELD.name(), "romeo");
+      map.put(EXTRA_FIELD_2.name(), "FO");
+
+      assertThat(decorator.decorateScope(null, Scope.NOOP)).isNotSameAs(Scope.NOOP);
+    }
   }
 
   @Test public void addsAndRemoves() {
@@ -103,7 +150,7 @@ public class CorrelationFieldScopeDecoratorTest {
   }
 
   @Test public void addsAndRemoves_withExtraField() {
-    Scope decorated = withExtraFieldDecorator.decorateScope(context, mock(Scope.class));
+    Scope decorated = withExtraFieldsDecorator.decorateScope(context, mock(Scope.class));
     assertThat(map).containsExactly(
       entry("traceId", "0000000000000001"),
       entry("parentId", "0000000000000002"),
@@ -165,7 +212,7 @@ public class CorrelationFieldScopeDecoratorTest {
     map.put("sampled", "false");
     map.put(EXTRA_FIELD.name(), "bob");
 
-    Scope decorated = withExtraFieldDecorator.decorateScope(context, mock(Scope.class));
+    Scope decorated = withExtraFieldsDecorator.decorateScope(context, mock(Scope.class));
     assertThat(map).containsExactly(
       entry("traceId", "0000000000000001"),
       entry("parentId", "0000000000000002"),
@@ -229,7 +276,7 @@ public class CorrelationFieldScopeDecoratorTest {
   }
 
   @Test public void revertsLateChanges_withExtraField() {
-    Scope decorated = withExtraFieldDecorator.decorateScope(context, mock(Scope.class));
+    Scope decorated = withExtraFieldsDecorator.decorateScope(context, mock(Scope.class));
     assertThat(map).containsExactly(
       entry("traceId", "0000000000000001"),
       entry("parentId", "0000000000000002"),

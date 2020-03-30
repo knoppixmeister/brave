@@ -51,7 +51,8 @@ import static java.util.Arrays.asList;
  * // Any scope operations (updates to the current span) apply the fields defined by the decorator.
  * ScopedSpan span = tracing.tracer().startScopedSpan("encode");
  * try {
- *   // %X{traceId} %X{parentId} %X{spanId} %X{sampled} %X{region} are in the logging context!
+ *   // The below log message will have %X{region} in the context!
+ *   logger.info("Encoding the span, hope it works");
  *   return encoder.encode();
  * } catch (RuntimeException | Error e) {
  *   span.error(e); // Unless you handle exceptions, you might not know the operation failed!
@@ -154,7 +155,7 @@ public abstract class CorrelationFieldScopeDecorator implements ScopeDecorator {
       this.flushOnUpdate = fieldUpdatable && ((Updatable) field).flushOnUpdate();
     }
 
-    @Override public Scope decorateScope(TraceContext traceContext, Scope scope) {
+    @Override public Scope decorateScope(@Nullable TraceContext traceContext, Scope scope) {
       String valueToRevert = context.get(field.name());
       String currentValue = traceContext != null ? field.getValue(traceContext) : null;
 
@@ -224,7 +225,7 @@ public abstract class CorrelationFieldScopeDecorator implements ScopeDecorator {
 
   static void popCurrentFieldUpdater(CorrelationFieldScope expected) {
     Object popped = currentFieldUpdaterStack().pop();
-    assert popped.equals(popped) :
+    assert equal(popped, expected) :
       "Misalignment: popped updater " + popped + " !=  expected " + expected;
   }
 
@@ -278,7 +279,7 @@ public abstract class CorrelationFieldScopeDecorator implements ScopeDecorator {
       fields = correlationFields.toArray(new CorrelationField[0]);
     }
 
-    @Override public Scope decorateScope(TraceContext traceContext, Scope scope) {
+    @Override public Scope decorateScope(@Nullable TraceContext traceContext, Scope scope) {
       int dirty = 0, flushOnUpdate = 0;
       String[] valuesToRevert = new String[fields.length];
       for (int i = 0; i < fields.length; i++) {
@@ -353,7 +354,7 @@ public abstract class CorrelationFieldScopeDecorator implements ScopeDecorator {
     return (bitset & (1 << i)) != 0;
   }
 
-  static boolean equal(@Nullable String a, @Nullable String b) {
+  static boolean equal(@Nullable Object a, @Nullable Object b) {
     return a == null ? b == null : a.equals(b); // Java 6 can't use Objects.equals()
   }
 }

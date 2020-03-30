@@ -109,15 +109,4 @@ public class MapPropagationFields<K, V> extends PropagationFields<K, V> {
     }
     return result;
   }
-
-  @Override public int hashCode() { // for unit tests
-    Map<K, V> values = this.values;
-    return values == null ? 0 : values.hashCode();
-  }
-
-  @Override public boolean equals(Object o) { // for unit tests
-    if (o == this) return true;
-    if (!(o instanceof MapPropagationFields)) return false;
-    return equal(this.values, ((MapPropagationFields) o).values);
-  }
 }

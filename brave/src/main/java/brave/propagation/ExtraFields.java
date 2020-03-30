@@ -165,17 +165,4 @@ final class ExtraFields extends PropagationFields<ExtraField, String> {
     }
     return -1;
   }
-
-  @Override public int hashCode() { // for unit tests
-    String[] values = this.values;
-    return values == null ? 0 : Arrays.hashCode(values);
-  }
-
-  @Override public boolean equals(Object o) { // for unit tests
-    if (o == this) return true;
-    if (!(o instanceof ExtraFields)) return false;
-    ExtraFields that = (ExtraFields) o;
-    String[] values = this.values, thatValues = that.values;
-    return values == null ? thatValues == null : Arrays.equals(values, thatValues);
-  }
 }

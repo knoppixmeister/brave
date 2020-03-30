@@ -42,7 +42,7 @@ public interface CorrelationField {
 
   interface Updatable extends CorrelationField {
     /**
-     * MCall this to immediately flush a value update to the correlation context as opposed waiting
+     * Call this to immediately flush a value update to the correlation context as opposed waiting
      * for the next scope decoration. This has a significant performance impact as it requires even
      * {@link CurrentTraceContext#maybeScope(TraceContext)} to always track values.
      *

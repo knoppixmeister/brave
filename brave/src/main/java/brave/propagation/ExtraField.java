@@ -28,7 +28,8 @@ import static java.util.Arrays.asList;
  * Defines a request-scoped field, usually but not always analogous to an HTTP header. Fields will
  * be no-op unless {@link ExtraFieldPropagation} is configured.
  *
- * <p>For example, if you have a need to know a specific request's country code in a downstream service, you can
+ * <p>For example, if you have a need to know a specific request's country code in a downstream
+ * service, you can
  * propagate it through the trace:
  * <pre>{@code
  * // Configure your extra field
@@ -295,25 +296,25 @@ public class ExtraField {
     }
 
     /** @see Builder#clearKeys() */
-    public CorrelationBuilder clearKeys() {
+    @Override public CorrelationBuilder clearKeys() {
       super.clearKeys();
       return this;
     }
 
-    /** @see Builder#addKey() */
-    public CorrelationBuilder addKey(String key) {
+    /** @see Builder#addKey(String) */
+    @Override public CorrelationBuilder addKey(String key) {
       super.addKey(key);
       return this;
     }
 
     /** @see Builder#redacted() */
-    public CorrelationBuilder redacted() {
+    @Override public CorrelationBuilder redacted() {
       super.redacted();
       return this;
     }
 
     /** @see Builder#build() */
-    public final WithCorrelation build() {
+    @Override public final WithCorrelation build() {
       return new WithCorrelation(this);
     }
   }
@@ -404,6 +405,8 @@ public class ExtraField {
   /**
    * The non-empty list of names for use in remote propagation. By default it includes only the
    * lowercase variant of the {@link #name()}.
+   *
+   * @see ExtraFieldPropagation#keys()
    */
   public List<String> keys() {
     return keysList;

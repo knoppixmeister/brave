@@ -113,10 +113,11 @@ public final class CorrelationFields {
       return name;
     }
 
+    // TODO try to seal the correlation field type eventhough it is tricky with extra fields.
     @Override public boolean equals(Object o) {
       if (o == this) return true;
-      if (!(o instanceof CorrelationField)) return false;
-      return lcName.equals(((CorrelationField) o).name());
+      if (!(o instanceof BaseCorrelationField)) return false;
+      return lcName.equals(((BaseCorrelationField) o).lcName);
     }
 
     @Override public int hashCode() {
