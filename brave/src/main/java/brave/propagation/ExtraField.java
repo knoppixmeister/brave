@@ -28,7 +28,7 @@ import static java.util.Arrays.asList;
  * Defines a request-scoped field, usually but not always analogous to an HTTP header. Fields will
  * be no-op unless {@link ExtraFieldPropagation} is configured.
  *
- * <p>For example, if you have a need to know the a specific request's country code, you can
+ * <p>For example, if you have a need to know a specific request's country code, you can
  * propagate it through the trace:
  * <pre>{@code
  * // Configure your extra field
@@ -39,7 +39,7 @@ import static java.util.Arrays.asList;
  * spanCustomizer.tag(countryCode.name(), countryCode.getValue(context));
  * spanCustomizer.tag("country-code", ExtraField.getValue("country-code"));
  *
- * // You can also set or override the value similarly, which might be needed if a new request
+ * // You can also update the value similarly, so that the new value will propagate downstream.
  * countryCode.setValue("FO");
  * countryCode.setValue(context, "FO");
  * ExtraField.setValue("country-code", "FO");
