@@ -34,7 +34,7 @@ import static java.util.Arrays.asList;
  * // Configure your extra field
  * countryCode = ExtraField.create("country-code");
  *
- * // If configured and set, you can retrieve it later. All of the below result in the same tag:
+ * // If configured and set, you can retrieve it later. All of the below result in the same tag in any service handling the trace:
  * spanCustomizer.tag(countryCode.name(), countryCode.getValue());
  * spanCustomizer.tag(countryCode.name(), countryCode.getValue(context));
  * spanCustomizer.tag("country-code", ExtraField.getValue("country-code"));
