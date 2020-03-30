@@ -28,7 +28,7 @@ import static java.util.Arrays.asList;
  * Defines a request-scoped field, usually but not always analogous to an HTTP header. Fields will
  * be no-op unless {@link ExtraFieldPropagation} is configured.
  *
- * <p>For example, if you have a need to know a specific request's country code, you can
+ * <p>For example, if you have a need to know a specific request's country code in a downstream service, you can
  * propagate it through the trace:
  * <pre>{@code
  * // Configure your extra field
