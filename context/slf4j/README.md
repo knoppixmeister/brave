@@ -10,7 +10,7 @@ correlationContext = new SLF4JContext();
 tracing = Tracing.newBuilder()
     .currentTraceContext(ThreadLocalCurrentTraceContext.newBuilder()
         .addScopeDecorator(CorrelationFieldScopeDecorator.create(correlationContext))
-       .build()
+        .build()
     )
     ...
     .build();
