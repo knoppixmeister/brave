@@ -22,7 +22,7 @@ import org.apache.log4j.MDC;
 import org.junit.ComparisonFailure;
 import org.junit.Test;
 
-import static brave.context.log4j12.Log4jContextTest.assumeMDCWorks;
+import static brave.context.log4j12.MDCScopeDecoratorTest.assumeMDCWorks;
 import static org.assertj.core.api.Assertions.assertThat;
 
 public class MDCCurrentTraceContextTest extends CurrentTraceContextTest {

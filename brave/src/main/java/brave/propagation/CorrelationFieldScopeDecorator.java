@@ -70,26 +70,8 @@ import static java.util.Arrays.asList;
  * @since 5.11
  */
 public abstract class CorrelationFieldScopeDecorator implements ScopeDecorator {
-  /**
-   * Initializes the builder with the standard fields: {@link CorrelationFields#TRACE_ID}, {@link
-   * CorrelationFields#PARENT_ID}, {@link CorrelationFields#SPAN_ID} and {@link
-   * CorrelationFields#SAMPLED}.
-   *
-   * @since 5.11
-   */
-  public static Builder newBuilder(CorrelationContext context) {
-    return new Builder(context);
-  }
-
-  /**
-   * @see #newBuilder(CorrelationContext)
-   * @since 5.11
-   */
-  public static ScopeDecorator create(CorrelationContext context) {
-    return new Builder(context).build();
-  }
-
-  public static final class Builder {
+  // do not define newBuilder or create() here as it will mask subtypes
+  public static abstract class Builder {
     final CorrelationContext context;
     final Set<CorrelationField> fields = new LinkedHashSet<>(asList(
       CorrelationFields.TRACE_ID,
@@ -98,7 +80,8 @@ public abstract class CorrelationFieldScopeDecorator implements ScopeDecorator {
       CorrelationFields.SAMPLED
     ));
 
-    Builder(CorrelationContext context) {
+    /** Internal constructor used by subtypes. */
+    protected Builder(CorrelationContext context) {
       if (context == null) throw new NullPointerException("context == null");
       this.context = context;
     }

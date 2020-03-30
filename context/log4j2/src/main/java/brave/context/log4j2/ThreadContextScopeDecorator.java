@@ -13,11 +13,15 @@
  */
 package brave.context.log4j2;
 
+import brave.internal.CorrelationContext;
 import brave.propagation.CorrelationFieldScopeDecorator;
-import brave.propagation.CurrentTraceContext.ScopeDecorator;
+import brave.propagation.CorrelationFields;
+import brave.propagation.CurrentTraceContext;
+import org.apache.logging.log4j.ThreadContext;
 
 /**
- * This is a shortcut to using {@link CorrelationFieldScopeDecorator} with {@link Log4j2Context}.
+ * Creates a {@link CorrelationFieldScopeDecorator} for Log4j 2 {@linkplain ThreadContext Thread
+ * Context}.
  *
  * <p>Ex.
  * <pre>{@code
@@ -33,7 +37,43 @@ import brave.propagation.CurrentTraceContext.ScopeDecorator;
  * @see CorrelationFieldScopeDecorator
  */
 public final class ThreadContextScopeDecorator {
-  public static ScopeDecorator create() {
-    return CorrelationFieldScopeDecorator.newBuilder(new Log4j2Context()).build();
+  /**
+   * Initializes the builder with the standard fields: {@link CorrelationFields#TRACE_ID}, {@link
+   * CorrelationFields#PARENT_ID}, {@link CorrelationFields#SPAN_ID} and {@link
+   * CorrelationFields#SAMPLED}.
+   *
+   * @since 5.11
+   */
+  public static CorrelationFieldScopeDecorator.Builder newBuilder() {
+    return new Builder();
+  }
+
+  /** @since 5.2 */
+  public static CurrentTraceContext.ScopeDecorator create() {
+    return new Builder().build();
+  }
+
+  static final class Builder extends CorrelationFieldScopeDecorator.Builder {
+    Builder() {
+      super(ThreadContextCorrelationContext.INSTANCE);
+    }
+  }
+
+  // TODO: see if we can read/write directly to skip some overhead similar to
+  // https://github.com/census-instrumentation/opencensus-java/blob/2903747aca08b1e2e29da35c5527ff046918e562/contrib/log_correlation/log4j2/src/main/java/io/opencensus/contrib/logcorrelation/log4j2/OpenCensusTraceContextDataInjector.java
+  enum ThreadContextCorrelationContext implements CorrelationContext {
+    INSTANCE;
+
+    @Override public String get(String name) {
+      return ThreadContext.get(name);
+    }
+
+    @Override public void put(String name, String value) {
+      ThreadContext.put(name, value);
+    }
+
+    @Override public void remove(String name) {
+      ThreadContext.remove(name);
+    }
   }
 }

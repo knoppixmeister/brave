@@ -11,20 +11,42 @@
  * or implied. See the License for the specific language governing permissions and limitations under
  * the License.
  */
-package brave.context.slf4j;
+package brave.context.log4j12;
 
 import brave.internal.Nullable;
-import brave.propagation.CorrelationFieldScopeDecorator;
 import brave.propagation.CurrentTraceContext;
 import brave.propagation.ThreadLocalCurrentTraceContext;
 import brave.propagation.TraceContext;
 import brave.test.propagation.CurrentTraceContextTest;
 import java.util.function.Supplier;
-import org.slf4j.MDC;
+import org.apache.log4j.MDC;
+import org.apache.log4j.helpers.Loader;
+import org.junit.ComparisonFailure;
+import org.junit.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assumptions.assumeThat;
 
-public class SLF4JContextTest extends CurrentTraceContextTest {
+public class MDCScopeDecoratorTest extends CurrentTraceContextTest {
+  public MDCScopeDecoratorTest() {
+    assumeMDCWorks();
+  }
+
+  /** {@link Loader#isJava1()} inteprets "java.version" of "11" as true (aka Java 1.1) */
+  static void assumeMDCWorks() {
+    String realJavaVersion = System.getProperty("java.version");
+    try {
+      System.setProperty("java.version", "1.8");
+      MDC.put("foo", "bar");
+      assumeThat(MDC.get("foo"))
+        .withFailMessage("Couldn't verify MDC in general")
+        .isEqualTo("bar");
+    } finally {
+      MDC.remove("foo");
+      System.setProperty("java.version", realJavaVersion);
+    }
+  }
+
   @Override protected Class<? extends Supplier<CurrentTraceContext.Builder>> builderSupplier() {
     return BuilderSupplier.class;
   }
@@ -32,10 +54,13 @@ public class SLF4JContextTest extends CurrentTraceContextTest {
   static class BuilderSupplier implements Supplier<CurrentTraceContext.Builder> {
     @Override public CurrentTraceContext.Builder get() {
       return ThreadLocalCurrentTraceContext.newBuilder()
-        .addScopeDecorator(CorrelationFieldScopeDecorator.newBuilder(new SLF4JContext())
-          .addField(EXTRA_FIELD)
-          .build());
+        .addScopeDecorator(MDCScopeDecorator.newBuilder().addField(EXTRA_FIELD).build());
     }
+  }
+
+  @Test(expected = ComparisonFailure.class) // Log4J 1.2.x MDC is inheritable by default
+  public void isnt_inheritable() throws Exception {
+    super.isnt_inheritable();
   }
 
   @Override protected void verifyImplicitContext(@Nullable TraceContext context) {
@@ -64,3 +89,4 @@ public class SLF4JContextTest extends CurrentTraceContextTest {
     }
   }
 }
+

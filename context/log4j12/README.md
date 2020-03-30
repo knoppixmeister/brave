@@ -1,5 +1,5 @@
 # brave-context-log4j12
-This adds trace and span IDs to the Log4J v1.2 Mapped Diagnostic Context so that you
+This adds trace and span IDs to the Log4J v1.2 Mapped Diagnostic Context (MDC) so that you
 can search or aggregate logs accordingly.
 
 To enable this, configure `brave.Tracing` with `Log4jContext`

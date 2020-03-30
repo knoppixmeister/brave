@@ -13,20 +13,18 @@
  */
 package brave.spring.beans;
 
-import brave.internal.CorrelationContext;
 import brave.propagation.CorrelationField;
 import brave.propagation.CorrelationFieldScopeDecorator;
-import brave.propagation.CorrelationFieldScopeDecorator.Builder;
 import java.util.List;
 import org.springframework.beans.factory.FactoryBean;
 
 /** Spring XML config does not support chained builders. This converts accordingly */
 public class CorrelationFieldScopeDecoratorFactoryBean implements FactoryBean {
-  CorrelationContext context;
+  CorrelationFieldScopeDecorator.Builder builder;
   List<CorrelationField> fields;
 
   @Override public CorrelationFieldScopeDecorator getObject() {
-    Builder builder = CorrelationFieldScopeDecorator.newBuilder(context);
+    if (builder == null) throw new NullPointerException("builder == null");
     if (fields != null) {
       builder.clearFields();
       for (CorrelationField field : fields) {
@@ -44,8 +42,8 @@ public class CorrelationFieldScopeDecoratorFactoryBean implements FactoryBean {
     return true;
   }
 
-  public void setContext(CorrelationContext context) {
-    this.context = context;
+  public void setBuilder(CorrelationFieldScopeDecorator.Builder builder) {
+    this.builder = builder;
   }
 
   public void setFields(List<CorrelationField> fields) {

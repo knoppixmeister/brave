@@ -13,7 +13,6 @@
  */
 package brave.propagation;
 
-import brave.context.log4j2.Log4j2Context;
 import brave.context.log4j2.ThreadContextScopeDecorator;
 import java.util.concurrent.TimeUnit;
 import org.openjdk.jmh.annotations.Benchmark;
@@ -40,15 +39,14 @@ import static brave.propagation.ExtraFieldPropagationBenchmarks.EXTRA_FIELD;
 @State(Scope.Thread)
 public class CurrentTraceContextBenchmarks {
   static final CurrentTraceContext base = ThreadLocalCurrentTraceContext.create();
-  static final Log4j2Context loggingContext = new Log4j2Context();
   static final CurrentTraceContext log4j2OnlyTraceId = ThreadLocalCurrentTraceContext.newBuilder()
-    .addScopeDecorator(CorrelationFieldScopeDecorator.newBuilder(loggingContext)
+    .addScopeDecorator(ThreadContextScopeDecorator.newBuilder()
       .clearFields()
       .addField(CorrelationFields.TRACE_ID)
       .build())
     .build();
   static final CurrentTraceContext log4j2OnlyExtra = ThreadLocalCurrentTraceContext.newBuilder()
-    .addScopeDecorator(CorrelationFieldScopeDecorator.newBuilder(loggingContext)
+    .addScopeDecorator(ThreadContextScopeDecorator.newBuilder()
       .clearFields()
       .addField(EXTRA_FIELD)
       .build())
@@ -61,7 +59,7 @@ public class CurrentTraceContextBenchmarks {
     ExtraFieldPropagation.newFactoryBuilder(B3Propagation.FACTORY).addField(EXTRA_FIELD).build();
 
   static final CurrentTraceContext log4j2Extra = ThreadLocalCurrentTraceContext.newBuilder()
-    .addScopeDecorator(CorrelationFieldScopeDecorator.newBuilder(loggingContext)
+    .addScopeDecorator(ThreadContextScopeDecorator.newBuilder()
       .addField(EXTRA_FIELD).build())
     .build();
 

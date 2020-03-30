@@ -11,43 +11,19 @@
  * or implied. See the License for the specific language governing permissions and limitations under
  * the License.
  */
-package brave.context.log4j12;
+package brave.context.log4j2;
 
 import brave.internal.Nullable;
-import brave.propagation.CorrelationFieldScopeDecorator;
 import brave.propagation.CurrentTraceContext;
 import brave.propagation.ThreadLocalCurrentTraceContext;
 import brave.propagation.TraceContext;
 import brave.test.propagation.CurrentTraceContextTest;
 import java.util.function.Supplier;
-import org.apache.log4j.MDC;
-import org.apache.log4j.helpers.Loader;
-import org.junit.ComparisonFailure;
-import org.junit.Test;
+import org.apache.logging.log4j.ThreadContext;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assumptions.assumeThat;
 
-public class Log4jContextTest extends CurrentTraceContextTest {
-  public Log4jContextTest() {
-    assumeMDCWorks();
-  }
-
-  /** {@link Loader#isJava1()} inteprets "java.version" of "11" as true (aka Java 1.1) */
-  static void assumeMDCWorks() {
-    String realJavaVersion = System.getProperty("java.version");
-    try {
-      System.setProperty("java.version", "1.8");
-      MDC.put("foo", "bar");
-      assumeThat(MDC.get("foo"))
-        .withFailMessage("Couldn't verify MDC in general")
-        .isEqualTo("bar");
-    } finally {
-      MDC.remove("foo");
-      System.setProperty("java.version", realJavaVersion);
-    }
-  }
-
+public class ThreadContextScopeDecoratorTest extends CurrentTraceContextTest {
   @Override protected Class<? extends Supplier<CurrentTraceContext.Builder>> builderSupplier() {
     return BuilderSupplier.class;
   }
@@ -55,41 +31,33 @@ public class Log4jContextTest extends CurrentTraceContextTest {
   static class BuilderSupplier implements Supplier<CurrentTraceContext.Builder> {
     @Override public CurrentTraceContext.Builder get() {
       return ThreadLocalCurrentTraceContext.newBuilder()
-        .addScopeDecorator(CorrelationFieldScopeDecorator.newBuilder(new Log4jContext())
-          .addField(EXTRA_FIELD)
-          .build());
+        .addScopeDecorator(ThreadContextScopeDecorator.newBuilder().addField(EXTRA_FIELD).build());
     }
-  }
-
-  @Test(expected = ComparisonFailure.class) // Log4J 1.2.x MDC is inheritable by default
-  public void isnt_inheritable() throws Exception {
-    super.isnt_inheritable();
   }
 
   @Override protected void verifyImplicitContext(@Nullable TraceContext context) {
     if (context != null) {
-      assertThat(MDC.get("traceId"))
+      assertThat(ThreadContext.get("traceId"))
         .isEqualTo(context.traceIdString());
-      assertThat(MDC.get("parentId"))
+      assertThat(ThreadContext.get("parentId"))
         .isEqualTo(context.parentIdString());
-      assertThat(MDC.get("spanId"))
+      assertThat(ThreadContext.get("spanId"))
         .isEqualTo(context.spanIdString());
-      assertThat(MDC.get("sampled"))
+      assertThat(ThreadContext.get("sampled"))
         .isEqualTo(context.sampled() != null ? context.sampled().toString() : null);
-      assertThat(MDC.get(EXTRA_FIELD.name()))
+      assertThat(ThreadContext.get(EXTRA_FIELD.name()))
         .isEqualTo(EXTRA_FIELD.getValue(context));
     } else {
-      assertThat(MDC.get("traceId"))
+      assertThat(ThreadContext.get("traceId"))
         .isNull();
-      assertThat(MDC.get("parentId"))
+      assertThat(ThreadContext.get("parentId"))
         .isNull();
-      assertThat(MDC.get("spanId"))
+      assertThat(ThreadContext.get("spanId"))
         .isNull();
-      assertThat(MDC.get("sampled"))
+      assertThat(ThreadContext.get("sampled"))
         .isNull();
-      assertThat(MDC.get(EXTRA_FIELD.name()))
+      assertThat(ThreadContext.get(EXTRA_FIELD.name()))
         .isNull();
     }
   }
 }
-

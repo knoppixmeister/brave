@@ -48,16 +48,16 @@ public class CorrelationFieldScopeDecoratorTest {
     .sampled(true)
     .build());
 
-  ScopeDecorator decorator = CorrelationFieldScopeDecorator.newBuilder(new Context()).build();
-  ScopeDecorator onlyTraceIdDecorator = CorrelationFieldScopeDecorator.newBuilder(new Context())
+  ScopeDecorator decorator = new TestBuilder().build();
+  ScopeDecorator onlyTraceIdDecorator = new TestBuilder()
     .clearFields()
     .addField(CorrelationFields.TRACE_ID)
     .build();
-  ScopeDecorator onlyExtraFieldDecorator = CorrelationFieldScopeDecorator.newBuilder(new Context())
+  ScopeDecorator onlyExtraFieldDecorator = new TestBuilder()
     .clearFields()
     .addField(EXTRA_FIELD)
     .build();
-  ScopeDecorator withExtraFieldDecorator = CorrelationFieldScopeDecorator.newBuilder(new Context())
+  ScopeDecorator withExtraFieldDecorator = new TestBuilder()
     .addField(EXTRA_FIELD)
     .build();
 
@@ -247,7 +247,15 @@ public class CorrelationFieldScopeDecoratorTest {
     assertThat(map).isEmpty();
   }
 
-  final class Context extends CorrelationContext {
+  static final class TestBuilder extends CorrelationFieldScopeDecorator.Builder {
+    TestBuilder() {
+      super(MapContext.INSTANCE);
+    }
+  }
+
+  enum MapContext implements CorrelationContext {
+    INSTANCE;
+
     @Override public String get(String name) {
       return map.get(name);
     }

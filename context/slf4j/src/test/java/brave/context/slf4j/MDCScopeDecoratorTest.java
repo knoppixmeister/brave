@@ -11,20 +11,19 @@
  * or implied. See the License for the specific language governing permissions and limitations under
  * the License.
  */
-package brave.context.log4j2;
+package brave.context.slf4j;
 
 import brave.internal.Nullable;
-import brave.propagation.CorrelationFieldScopeDecorator;
 import brave.propagation.CurrentTraceContext;
 import brave.propagation.ThreadLocalCurrentTraceContext;
 import brave.propagation.TraceContext;
 import brave.test.propagation.CurrentTraceContextTest;
 import java.util.function.Supplier;
-import org.apache.logging.log4j.ThreadContext;
+import org.slf4j.MDC;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-public class Log4j2ContextTest extends CurrentTraceContextTest {
+public class MDCScopeDecoratorTest extends CurrentTraceContextTest {
   @Override protected Class<? extends Supplier<CurrentTraceContext.Builder>> builderSupplier() {
     return BuilderSupplier.class;
   }
@@ -32,34 +31,32 @@ public class Log4j2ContextTest extends CurrentTraceContextTest {
   static class BuilderSupplier implements Supplier<CurrentTraceContext.Builder> {
     @Override public CurrentTraceContext.Builder get() {
       return ThreadLocalCurrentTraceContext.newBuilder()
-        .addScopeDecorator(CorrelationFieldScopeDecorator.newBuilder(new Log4j2Context())
-          .addField(EXTRA_FIELD)
-          .build());
+        .addScopeDecorator(MDCScopeDecorator.newBuilder().addField(EXTRA_FIELD).build());
     }
   }
 
   @Override protected void verifyImplicitContext(@Nullable TraceContext context) {
     if (context != null) {
-      assertThat(ThreadContext.get("traceId"))
+      assertThat(MDC.get("traceId"))
         .isEqualTo(context.traceIdString());
-      assertThat(ThreadContext.get("parentId"))
+      assertThat(MDC.get("parentId"))
         .isEqualTo(context.parentIdString());
-      assertThat(ThreadContext.get("spanId"))
+      assertThat(MDC.get("spanId"))
         .isEqualTo(context.spanIdString());
-      assertThat(ThreadContext.get("sampled"))
+      assertThat(MDC.get("sampled"))
         .isEqualTo(context.sampled() != null ? context.sampled().toString() : null);
-      assertThat(ThreadContext.get(EXTRA_FIELD.name()))
+      assertThat(MDC.get(EXTRA_FIELD.name()))
         .isEqualTo(EXTRA_FIELD.getValue(context));
     } else {
-      assertThat(ThreadContext.get("traceId"))
+      assertThat(MDC.get("traceId"))
         .isNull();
-      assertThat(ThreadContext.get("parentId"))
+      assertThat(MDC.get("parentId"))
         .isNull();
-      assertThat(ThreadContext.get("spanId"))
+      assertThat(MDC.get("spanId"))
         .isNull();
-      assertThat(ThreadContext.get("sampled"))
+      assertThat(MDC.get("sampled"))
         .isNull();
-      assertThat(ThreadContext.get(EXTRA_FIELD.name()))
+      assertThat(MDC.get(EXTRA_FIELD.name()))
         .isNull();
     }
   }

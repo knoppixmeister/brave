@@ -21,18 +21,19 @@ import brave.propagation.CorrelationFieldScopeDecorator;
  * <p><em>This is internal:</em> All subtypes of {@link CorrelationFieldScopeDecorator} are sealed
  * to this repository until we better understand implications of making this a public type.
  */
-// TODO: revert signatures to protected once moved back into brave.propagation package
-public abstract class CorrelationContext { // abstract to allow optimized methods to be added later
+// NOTE: revert to abstract class with protected signatures if this is ever promoted to the
+// brave.propagation package.
+public interface CorrelationContext {
   /**
    * Returns the correlation property of the specified name iff it is a string, or null otherwise.
    */
-  public abstract @Nullable String get(String name);
+  @Nullable String get(String name);
 
   /** Replaces the correlation property of the specified name with a non-null value. */
-  public abstract void put(String name, @Nullable String value);
+  void put(String name, @Nullable String value);
 
   /** Removes the correlation property of the specified name. */
-  public abstract void remove(String name);
+  void remove(String name);
 
   // The below will be sorted into RATIONALE.md once stable
   //
