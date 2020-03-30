@@ -294,7 +294,7 @@ public class ExtraField {
       return this;
     }
 
-    /** @see Builder#redacted() */
+    /** @see Builder#clearKeys() */
     public CorrelationBuilder clearKeys() {
       super.clearKeys();
       return this;
