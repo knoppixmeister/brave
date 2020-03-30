@@ -103,7 +103,7 @@ public class ExtraField {
    * Creates a field that is referenced the same in-process as it is on the wire. For example, the
    * name "x-vcap-request-id" would be set as-is including the prefix.
    *
-   * @param name will be currently lower-cased for remote propagation
+   * @param name will be lower-cased for remote propagation
    * @since 5.11
    */
   public static ExtraField create(String name) {
