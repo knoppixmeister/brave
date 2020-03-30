@@ -113,7 +113,7 @@ public class ExtraField {
   /**
    * Creates a builder for the specified {@linkplain #name()}.
    *
-   * @param name will be currently lower-cased for remote propagation
+   * @param name will be lower-cased for remote propagation
    * @since 5.11
    */
   public static Builder newBuilder(String name) {
